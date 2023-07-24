@@ -1,2 +1,3 @@
-# application
-Shared kernel for application layers
+# Application
+
+Application layer for PythonEDA applications.
