@@ -3,7 +3,7 @@ pythoneda/application/pythoneda.py
 
 This file defines PythonEDA.
 
-Copyright (C) 2023-today rydnr's pythoneda-shared-application/application
+Copyright (C) 2023-today rydnr's pythoneda-shared-pythoneda/application
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -304,7 +304,7 @@ class PythonEDA():
                     print(f"Error in {module.__file__}: configure_logging")
         return result
 
-from pythonedaapplication import bootstrap
+from pythoneda.application import bootstrap
 import asyncio
 import importlib
 import importlib.util
