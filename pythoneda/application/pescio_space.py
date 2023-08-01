@@ -1,7 +1,7 @@
 """
-pythoneda/application/hexagonal_layer.py
+pythoneda/application/pescio_space.py
 
-This file declares the HexagonalLayer class.
+This file declares the PescioSpace class.
 
 Copyright (C) 2023-today rydnr's pythoneda-shared-pythoneda/application
 
@@ -20,18 +20,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from enum import Enum, auto
 
-class HexagonalLayer(Enum):
+class PescioSpace(Enum):
     """
-    An enumerated type to identify layers in hexagonal architectures.
+    An enumerated type to identify Carlo Pescio's spaces (https://www.youtube.com/watch?v=WPgYju3KnIY)
 
-    Class name: HexagonalLayer
+    Class name: PescioSpace
 
     Responsibilities:
-        - Define the different types of layers.
+        - Define the different types of spaces.
 
     Collaborators:
         - None. But this class is used both by pythoneda.application.bootstrap and pythoneda.application.pythoneda.PythonEDA
     """
-    DOMAIN = auto()
-    INFRASTRUCTURE = auto()
-    APPLICATION = auto()
+
+    DECISION = auto()
+    ARTIFACT = auto()
+    RUNTIME = auto()
+    TENANT = auto()

@@ -1,7 +1,7 @@
 """
-pythoneda/application/hexagonal_layer.py
+pythoneda/application/architectural_role.py
 
-This file declares the HexagonalLayer class.
+This file declares the ArchitecturalRole class.
 
 Copyright (C) 2023-today rydnr's pythoneda-shared-pythoneda/application
 
@@ -20,18 +20,21 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from enum import Enum, auto
 
-class HexagonalLayer(Enum):
-    """
-    An enumerated type to identify layers in hexagonal architectures.
 
-    Class name: HexagonalLayer
+class PescioSpace(Enum):
+    """
+    An enumerated type to identify the different roles each repository plays architecture-wise.
+
+    Class name: PescioSpace
 
     Responsibilities:
-        - Define the different types of layers.
+        - Define the different types of architectural roles.
 
     Collaborators:
         - None. But this class is used both by pythoneda.application.bootstrap and pythoneda.application.pythoneda.PythonEDA
     """
-    DOMAIN = auto()
-    INFRASTRUCTURE = auto()
-    APPLICATION = auto()
+
+    BOUNDED_CONTEXT = auto()
+    EVENT = auto()
+    SHARED_KERNEL = auto()
+    REALM = auto()

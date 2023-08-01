@@ -54,7 +54,6 @@ class PythonEDA():
         super().__init__()
         self._primary_ports = []
         self.fix_syspath(file)
-        print(f'Before loading packages')
         self.load_all_packages()
         self._domain_packages, self._domain_modules, self._infrastructure_packages, self._infrastructure_modules = self.load_pythoneda_packages()
         self._domain_ports = self.find_domain_ports(self._domain_modules)
