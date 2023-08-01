@@ -25,6 +25,7 @@ import logging
 import os
 from pathlib import Path
 import pkgutil
+from pythoneda.application.hexagonal_layer import HexagonalLayer
 import sys
 from typing import Dict, List
 import warnings
@@ -32,56 +33,61 @@ import warnings
 def is_domain_package(package) -> bool:
     """
     Checks if given package is marked as domain package.
-    :param package: The package.
-    :type package: Package
+    :type package: builtins.module
+    :type package: package
     :return: True if so.
     :rtype: bool
     """
-    return is_package_of_type(package, "domain")
+    return is_package_of_type(package, HexagonalLayer.DOMAIN)
 
 def is_infrastructure_package(package) -> bool:
     """
     Checks if given package is marked as infrastructure package.
     :param package: The package.
-    :type package: Package
+    :type package: builtins.module
     :return: True if so.
     :rtype: bool
     """
-    return is_package_of_type(package, "infrastructure")
+    return is_package_of_type(package, HexagonalLayer.INFRASTRUCTURE)
 
-def is_package_of_type(package, type: str) -> bool:
+def is_package_of_type(package, type: HexagonalLayer) -> bool:
     """
     Checks if given package is marked as of given type.
     :param package: The package.
-    :type package: Package
+    :type package: builtins.module
     :param type: The type of package.
-    :type type: str
+    :type type: pythoneda.application.hexagonal_layer.HexagonalLayer
     :return: True if so.
     :rtype: bool
     """
-    package_path = Path(package.__path__[0])
-    return (package_path / f".pythoneda-{type}").exists()
+    return any((Path(package_path) / f".pythoneda-{type.name.lower()}").exists() for package_path in package.__path__)
 
-def get_interfaces_in_module(iface, module):
+def get_interfaces_in_module(iface, module, excluding=None):
     """
     Retrieves the interfaces extending given one in a module.
     :param iface: The parent interface.
     :type iface: Object
     :param module: The module.
-    :type module: Module
+    :type module: builtins.module
+    :param excluding: Do not take into account matches implementing this class.
+    :type excluding: type
     :return: The list of intefaces in given module.
     :rtype: List
     """
     matches = []
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', category=DeprecationWarning)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', category=DeprecationWarning)
+        try:
             for class_name, cls in inspect.getmembers(module, inspect.isclass):
                 if (issubclass(cls, iface) and
                     cls != iface):
-                    matches.append(cls)
-    except ImportError:
-        pass
+                    if excluding and issubclass(cls, excluding):
+                        pass
+                    else:
+                        matches.append(cls)
+        except ImportError:
+            logging.getLogger(__name__).critical(f'Cannot get members of {module}')
+            pass
     return matches
 
 def get_adapters(interface, modules: List):
@@ -90,7 +96,7 @@ def get_adapters(interface, modules: List):
     :param interface: The interface.
     :type interface: Object
     :param modules: The modules to inspect.
-    :type modules: List
+    :type modules: List[builtins.module]
     :return: The list of implementations.
     :rtype: List
     """
@@ -102,7 +108,7 @@ def get_adapters(interface, modules: List):
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore', category=DeprecationWarning)
                 for class_name, cls in inspect.getmembers(module, inspect.isclass):
-                    if (inspect.isclass(cls)) and (issubclass(cls, interface)) and (cls != interface) and (abc.ABC not in cls.__bases__):
+                    if (inspect.isclass(cls)) and (issubclass(cls, interface)) and (cls != interface) and (abc.ABC not in cls.__bases__) and not cls in implementations:
                         implementations.append(cls)
         except ImportError as err:
             print(f'Error importing {module}: {err}')
@@ -110,24 +116,26 @@ def get_adapters(interface, modules: List):
     return implementations
 
 
-def import_submodules(package, recursive=True):
+def import_submodules(package, recursive=True, type:HexagonalLayer=None):
     """
     Imports all submodules of a module, recursively, including subpackages.
     :param package: package (name or actual module)
-    :type package: str | module
+    :type package: builtins.module
+    :param type: The type of submodules (domain or infrastructure)
+    :type type: pythoneda.application.hexagonal_layer.HexagonalLayer
+    :param recursive: Whether to recursively import submodules.
+    :type recursive: bool
     :rtype: dict[str, types.ModuleType]
     """
-    if isinstance(package, str):
-        package = __import__(package, fromlist=[''])
-
     results = {}
 
-    for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
-        full_name = package.__name__ + '.' + name
+    if type is None or is_package_of_type(package, type):
+        for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
+            full_name = package.__name__ + '.' + name
+            results[full_name] = __import__(full_name, fromlist=[''])
 
-        results[full_name] = __import__(full_name, fromlist=[''])
-
-        if recursive and is_pkg:
-            results.update(import_submodules(full_name))
+            if recursive and is_pkg:
+                child_package = __import__(full_name, fromlist=[''])
+                results.update(import_submodules(child_package, recursive)) # type is not considered for descendants.
 
     return results

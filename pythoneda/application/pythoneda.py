@@ -21,6 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 from pathlib import Path
 import pkgutil
+from pythoneda.application.hexagonal_layer import HexagonalLayer
 import sys
 from typing import Callable, Dict, List
 import warnings
@@ -53,7 +54,9 @@ class PythonEDA():
         super().__init__()
         self._primary_ports = []
         self.fix_syspath(file)
-        self._domain_packages, self._domain_modules, self._infrastructure_packages, self._infrastructure_modules = self.load_packages()
+        print(f'Before loading packages')
+        self.load_all_packages()
+        self._domain_packages, self._domain_modules, self._infrastructure_packages, self._infrastructure_modules = self.load_pythoneda_packages()
         self._domain_ports = self.find_domain_ports(self._domain_modules)
         self.initialize()
 
@@ -133,37 +136,150 @@ class PythonEDA():
         if base_folder not in sys.path:
             sys.path.append(base_folder)
 
-    def load_packages(self) -> tuple:
+    def from_pythoneda(self, pkg) -> bool:
+        """
+        Checks if given package is from PythonEDA.
+        :param pkg: The package.
+        :type pkg: module
+        :return: True in such case.
+        :rtype: bool
+        """
+        if pkg.__name__ == 'pythoneda':
+            result = True
+        elif pkg.__name__ == '' or pkg.__name__ == pkg.__package__:
+            result = False
+        else:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=DeprecationWarning)
+                try:
+                    result = self.from_pythoneda(importlib.import_module(pkg.__package__))
+                except ModuleNotFoundError as err:
+                    import traceback
+                    traceback.print_exc()
+                    logging.getLogger(__name__).critical(f'Cannot import {pkg.__package__}: Missing dependency {err.name} !!')
+                    logging.getLogger(__name__).critical(err)
+        return result
+
+    def load_all_packages(self):
+        """
+        Loads all packages.
+        """
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
+            for importer, pkg, ispkg in pkgutil.iter_modules():
+                if pkg != 'tkinter':
+                    if ispkg:
+                        loader = importer.find_module(pkg)
+                        try:
+                            loader.load_module(pkg)
+                        except Exception as err:
+                            logging.getLogger(__name__).critical(f'Cannot import {pkg}: Missing dependency {err.name} !!!')
+                            logging.getLogger(__name__).critical(err)
+
+
+    def custom_sort(self, item):
+        split_item = item.split(".")
+        return len(split_item), split_item
+
+    def is_empty_namespace_folder(self, directory:str) -> bool:
+        """
+        Checks given folder is an empty namespace.
+        :param directory: The folder to analyze.
+        :type directory: str
+        :return: True in such case.
+        :rtype: bool
+        """
+        has_init = False
+        has_other_py_files = False
+        has_subfolders = False
+
+        # List the contents of the directory
+        for name in os.listdir(directory):
+            path = os.path.join(directory, name)
+
+            # Check if the file is __init__.py
+            if os.path.isfile(path) and name == '__init__.py':
+                has_init = True
+
+            # Check if the file is not __init__.py
+            if os.path.isfile(path) and name != '__init__.py' and name.endswith(".py"):
+                has_other_py_files = True
+
+            # Check if there are subdirectories
+            if os.path.isdir(path):
+                has_subfolders = True
+
+        # Condition to make sure __init__.py is the only py file and there are subdirectories
+        return has_init and has_subfolders and not has_other_py_files
+
+    def get_path_of_packages_under_namespace(self, namespace:str) -> Dict:
+        """
+        Retrieves the paths of packages under given namespace.
+        :param namespace: The namespace.
+        :type namespace: str
+        :return: A dictionary of package names and paths.
+        :rtype: Dict[str, str]
+        """
+        all_sub_packages = {}
+
+        for path in sys.path:
+            init_file = Path(path) / "pythoneda" / Path("__init__.py")
+            if os.path.exists(init_file):
+
+            # walk through all files and directories in site-packages
+                for root, dirs, _ in os.walk(path):
+
+                    # only consider directories
+                    for dir in dirs:
+
+                        # construct the full path
+                        full_path = os.path.join(root, dir)
+
+                        # if this directory is a package
+                        if os.path.isfile(os.path.join(full_path, '__init__.py')):
+
+                            # get the package name
+                            package_name = full_path[len(path)+1:].replace(os.sep, '.')
+
+                            # if the package is a sub-package of the namespace
+                            if package_name.startswith(namespace) and not all_sub_packages.get(package_name, None):
+                                all_sub_packages[package_name] = full_path
+
+        return all_sub_packages
+
+    def load_pythoneda_packages(self) -> tuple:
         """
         Loads the PythonEDA-related packages.
         :return: A tuple consisting of (domain packages, domain modules, infrastructure packages, infrastructure modules).
         :rtype: tuple
         """
+
         domain_packages = []
         domain_modules = []
         infrastructure_packages = []
         infrastructure_modules = []
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
-            for importer, pkg, ispkg in pkgutil.iter_modules():
-                if ispkg:
-                    if pkg.startswith("pythoneda"):
-                        loader = importer.find_module(pkg)
-                        try:
-                            package = loader.load_module(pkg)
-                            domain_package = bootstrap.is_domain_package(package)
-                            infrastructure_package = bootstrap.is_infrastructure_package(package)
-                            if domain_package or infrastructure_package:
-                                submodules = bootstrap.import_submodules(package, True)
-                            if domain_package:
-                                domain_packages.append(package)
-                                domain_modules.extend(submodules.values())
-                            if infrastructure_package:
-                                infrastructure_packages.append(package)
-                                infrastructure_modules.extend(submodules.values())
-                        except ModuleNotFoundError as err:
-                            logging.getLogger(__name__).critical(f'Cannot import {package.__name__}: Missing dependency {err.name}')
-                            logging.getLogger(__name__).critical(err)
+            packages = self.get_path_of_packages_under_namespace("pythoneda")
+            for package_name in packages:
+                try:
+                    package = __import__(package_name, fromlist=[''])
+                    package_path = packages[package_name]
+                    domain_package = bootstrap.is_domain_package(package)
+                    infrastructure_package = bootstrap.is_infrastructure_package(package)
+                    if domain_package:
+                        submodules = bootstrap.import_submodules(package, True, HexagonalLayer.DOMAIN)
+                        domain_packages.append(package_path)
+                        domain_modules.extend(submodules.values())
+                    if infrastructure_package:
+                        submodules = bootstrap.import_submodules(package, True, HexagonalLayer.INFRASTRUCTURE)
+                        infrastructure_packages.append(package_path)
+                        infrastructure_modules.extend(submodules.values())
+                except Exception as err:
+                    import traceback
+                    traceback.print_exc()
+                    logging.getLogger(__name__).critical(f'Cannot import {package_path}: Missing dependency {err} when trying to import {package_name}!!')
+                    logging.getLogger(__name__).critical(err)
 
         return (domain_packages, domain_modules, infrastructure_packages, infrastructure_modules)
 
@@ -177,8 +293,12 @@ class PythonEDA():
         """
         result = []
         from pythoneda.port import Port
+        from pythoneda.primary_port import PrimaryPort
         for module in modules:
-            result.extend(bootstrap.get_interfaces_in_module(Port, module))
+            interfaces = bootstrap.get_interfaces_in_module(Port, module, PrimaryPort)
+#            print(f'Interfaces in {module} -> {interfaces}')
+            result.extend(interfaces)
+#        print(f'Domain ports found -> {result}')
         return result
 
     @classmethod
@@ -209,6 +329,9 @@ class PythonEDA():
             implementations = bootstrap.get_adapters(port, self.infrastructure_modules)
             if len(implementations) == 0:
                 logging.getLogger(__name__).critical(f'No implementations found for {port}')
+            elif len(implementations) > 1:
+                logging.getLogger(__name__).critical(f'Several implementations found for {port}: {implementations}')
+                mappings.update({ port: implementations[0]() })
             else:
                 mappings.update({ port: implementations[0]() })
         from pythoneda.ports import Ports
@@ -314,4 +437,4 @@ import sys
 
 if __name__ == "__main__":
 
-    asyncio.run(PythonEDA.main(__file__))
+    asyncio.run(PythonEDA.main())
