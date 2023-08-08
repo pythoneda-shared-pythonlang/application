@@ -21,7 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 from pathlib import Path
 import pkgutil
-from pythoneda.application.hexagonal_layer import HexagonalLayer
+from pythoneda.application import HexagonalLayer
 import sys
 from typing import Callable, Dict, List
 import warnings

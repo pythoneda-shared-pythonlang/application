@@ -21,17 +21,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from enum import Enum, auto
 
 
-class PescioSpace(Enum):
+class ArchitecturalRole(Enum):
     """
     An enumerated type to identify the different roles each repository plays architecture-wise.
 
-    Class name: PescioSpace
+    Class name: ArchitecturalRol
 
     Responsibilities:
         - Define the different types of architectural roles.
 
     Collaborators:
-        - None. But this class is used both by pythoneda.application.bootstrap and pythoneda.application.pythoneda.PythonEDA
+        - None. But this class is used both by pythoneda.application.bootstrap and pythoneda.application.PythonEDA
     """
 
     BOUNDED_CONTEXT = auto()
