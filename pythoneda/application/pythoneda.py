@@ -22,6 +22,7 @@ import os
 from pathlib import Path
 import pkgutil
 from pythoneda.application import HexagonalLayer
+from pythoneda.banner import Banner
 import sys
 from typing import Callable, Dict, List
 import warnings
@@ -45,14 +46,17 @@ class PythonEDA():
 
     _singleton = None
 
-    def __init__(self, file=__file__):
+    def __init__(self, banner, file=__file__):
         """
         Initializes the instance.
+        :param banner: The project's banner.
+        :type banner: pythoneda.banner.Banner
         :param file: The file where this specific instance is defined.
         :type file: str
         """
         super().__init__()
         self._primary_ports = []
+        banner.print()
         self.fix_syspath(file)
         self.load_all_packages()
         self._domain_packages, self._domain_modules, self._infrastructure_packages, self._infrastructure_modules = self.load_pythoneda_packages()
@@ -172,8 +176,9 @@ class PythonEDA():
                         try:
                             loader.load_module(pkg)
                         except Exception as err:
-                            logging.getLogger(__name__).critical(f'Cannot import {pkg}: Missing dependency {err.name} !!!')
-                            logging.getLogger(__name__).critical(err)
+                            if pkg != "matplotlib_inline":
+                                logging.getLogger(__name__).critical(f'Cannot import {pkg}: Missing dependency {err.name}')
+                                logging.getLogger(__name__).critical(err)
 
 
     def custom_sort(self, item):
@@ -267,13 +272,15 @@ class PythonEDA():
                     domain_package = bootstrap.is_domain_package(package)
                     infrastructure_package = bootstrap.is_infrastructure_package(package)
                     if domain_package:
+                        if package_path not in domain_packages:
+                            domain_packages.append(package_path)
                         submodules = bootstrap.import_submodules(package, True, HexagonalLayer.DOMAIN)
-                        domain_packages.append(package_path)
-                        domain_modules.extend(submodules.values())
+                        self.__class__.extend_missing_items(domain_modules, submodules.values())
                     if infrastructure_package:
+                        if package_path not in infrastructure_packages:
+                            infrastructure_packages.append(package_path)
                         submodules = bootstrap.import_submodules(package, True, HexagonalLayer.INFRASTRUCTURE)
-                        infrastructure_packages.append(package_path)
-                        infrastructure_modules.extend(submodules.values())
+                        self.__class__.extend_missing_items(infrastructure_modules, submodules.values())
                 except Exception as err:
                     import traceback
                     traceback.print_exc()
@@ -294,10 +301,9 @@ class PythonEDA():
         from pythoneda.port import Port
         from pythoneda.primary_port import PrimaryPort
         for module in modules:
-            interfaces = bootstrap.get_interfaces_in_module(Port, module, PrimaryPort)
-#            print(f'Interfaces in {module} -> {interfaces}')
-            result.extend(interfaces)
-#        print(f'Domain ports found -> {result}')
+            if bootstrap.is_domain_module(module):
+                interfaces = bootstrap.get_interfaces_of_module(Port, module, PrimaryPort)
+                self.__class__.extend_missing_items(result, interfaces)
         return result
 
     @classmethod
@@ -324,23 +330,26 @@ class PythonEDA():
         Initializes this instance.
         """
         mappings = {}
-        for port in self.domain_ports:
-            implementations = bootstrap.get_adapters(port, self.infrastructure_modules)
-            if len(implementations) == 0:
-                logging.getLogger(__name__).critical(f'No implementations found for {port}')
-            elif len(implementations) > 1:
-                logging.getLogger(__name__).critical(f'Several implementations found for {port}: {implementations}')
-                mappings.update({ port: implementations[0]() })
-            else:
-                mappings.update({ port: implementations[0]() })
-        from pythoneda.ports import Ports
-        Ports.initialize(mappings)
-        from pythoneda.primary_port import PrimaryPort
-        self._primary_ports = bootstrap.get_adapters(PrimaryPort, self.infrastructure_modules)
-        from pythoneda.event_listener import EventListener
-        EventListener.find_listeners()
-        from pythoneda.event_emitter import EventEmitter
-        EventEmitter.register_receiver(self)
+        if len(self.infrastructure_modules) == 0:
+            logging.getLogger(__name__).critical(f'No infrastructure modules detected!')
+        else:
+            for port in self.domain_ports:
+                implementations = bootstrap.get_adapters(port, self.infrastructure_modules)
+                if len(implementations) == 0:
+                    logging.getLogger(__name__).critical(f'No implementations found for {port} in {self.infrastructure_modules}')
+                elif len(implementations) > 1:
+                    logging.getLogger(__name__).critical(f'Several implementations found for {port}: {implementations}')
+                    mappings.update({ port: implementations[0]() })
+                else:
+                    mappings.update({ port: implementations[0]() })
+            from pythoneda.ports import Ports
+            Ports.initialize(mappings)
+            from pythoneda.primary_port import PrimaryPort
+            self._primary_ports = bootstrap.get_adapters(PrimaryPort, self.infrastructure_modules)
+            from pythoneda.event_listener import EventListener
+            EventListener.find_listeners()
+            from pythoneda.event_emitter import EventEmitter
+            EventEmitter.register_receiver(self)
 
     @classmethod
     def delegate_priority(cls, primaryPort) -> int:
@@ -378,11 +387,11 @@ class PythonEDA():
             for listenerClass in EventListener.listeners_for(event.__class__):
                 resultingEvents = await listenerClass.accept(event)
                 if resultingEvents and len(resultingEvents) > 0:
-                    firstEvents.extend(resultingEvents)
+                    self.__class__.extend_missing_items(firstEvents, resultingEvents)
             if len(firstEvents) > 0:
-                result.extend(firstEvents)
+                self.__class__.extend_missing_items(result, firstEvents)
                 for event in firstEvents:
-                    result.extend(await self.accept(event))
+                    self.__class__.extend_missing_items(result, await self.accept(event))
         return result
 
     async def emit(self, event):
@@ -425,6 +434,17 @@ class PythonEDA():
                 else:
                     print(f"Error in {module.__file__}: configure_logging")
         return result
+
+    @classmethod
+    def extend_missing_items(cls, first:List, second:List):
+        """
+        Adds the items of the second list into the first list, excluding those already included.
+        :param first: The first list.
+        :type first: List
+        :param second: The second list.
+        :type second: List
+        """
+        [first.append(item) for item in second if item not in first]
 
 from pythoneda.application import bootstrap
 import asyncio
