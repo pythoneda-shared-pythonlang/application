@@ -46,7 +46,7 @@ class PythonEDA():
 
     _singleton = None
 
-    def __init__(self, banner, file=__file__):
+    def __init__(self, banner=None, file=__file__):
         """
         Initializes the instance.
         :param banner: The project's banner.
@@ -56,7 +56,8 @@ class PythonEDA():
         """
         super().__init__()
         self._primary_ports = []
-        banner.print()
+        if banner:
+            banner.print()
         self.fix_syspath(file)
         self.load_all_packages()
         self._domain_packages, self._domain_modules, self._infrastructure_packages, self._infrastructure_modules = self.load_pythoneda_packages()
