@@ -160,8 +160,8 @@ class PythonEDA():
                 except ModuleNotFoundError as err:
                     import traceback
                     traceback.print_exc()
-                    logging.getLogger(__name__).critical(f'Cannot import {pkg.__package__}: Missing dependency {err.name} !!')
-                    logging.getLogger(__name__).critical(err)
+                    logging.getLogger(self.__class__.__module__).critical(f'Cannot import {pkg.__package__}: Missing dependency {err.name} !!')
+                    logging.getLogger(self.__class__.__module__).critical(err)
         return result
 
     def load_all_packages(self):
@@ -171,16 +171,36 @@ class PythonEDA():
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
             for importer, pkg, ispkg in pkgutil.iter_modules():
-                if pkg != 'tkinter':
+                if pkg != 'pythoneda' and pkg != 'tkinter' and pkg != 'matplotlib_inline':
                     if ispkg:
                         loader = importer.find_module(pkg)
                         try:
                             loader.load_module(pkg)
                         except Exception as err:
-                            if pkg != "matplotlib_inline":
-                                logging.getLogger(__name__).critical(f'Cannot import {pkg}: Missing dependency {err.name}')
-                                logging.getLogger(__name__).critical(err)
+                            logging.getLogger(self.__class__.__module__).critical(f'Cannot import {pkg}: Missing dependency {err.name}')
+                            logging.getLogger(self.__class__.__module__).critical(err)
 
+        self.load_module_recursive('pythoneda')
+        logging.getLogger(self.__class__.__module__).info('PythonEDA packages loaded')
+
+    def load_module_recursive(self, name):
+        """
+        Loads given module, recursively.
+        """
+        try:
+            # Try to load the module/package
+            module = __import__(name, fromlist=[''])
+            logging.getLogger(self.__class__.__module__).debug(f'Loaded {name}')
+
+            # If it's a package, discover its submodules and load them
+            if pkgutil.get_loader(name).is_package(name):
+                pkgpath = module.__path__
+                for _, mod_name, ispkg in pkgutil.iter_modules(pkgpath):
+                    self.load_module_recursive(f"{name}.{mod_name}")
+
+        except ImportError as err:
+            logging.getLogger(self.__class__.__module__).critical(f'Cannot import {name}: Missing dependency {err.name}')
+            logging.getLogger(self.__class__.__module__).critical(err)
 
     def custom_sort(self, item):
         split_item = item.split(".")
@@ -285,8 +305,8 @@ class PythonEDA():
                 except Exception as err:
                     import traceback
                     traceback.print_exc()
-                    logging.getLogger(__name__).critical(f'Cannot import {package_path}: Missing dependency {err} when trying to import {package_name}!!')
-                    logging.getLogger(__name__).critical(err)
+                    logging.getLogger(self.__class__.__module__).critical(f'Cannot import {package_path}: Missing dependency {err} when trying to import {package_name}!!')
+                    logging.getLogger(self.__class__.__module__).critical(err)
 
         return (domain_packages, domain_modules, infrastructure_packages, infrastructure_modules)
 
@@ -332,14 +352,14 @@ class PythonEDA():
         """
         mappings = {}
         if len(self.infrastructure_modules) == 0:
-            logging.getLogger(__name__).critical(f'No infrastructure modules detected!')
+            logging.getLogger(self.__class__.__module__).critical(f'No infrastructure modules detected!')
         else:
             for port in self.domain_ports:
                 implementations = bootstrap.get_adapters(port, self.infrastructure_modules)
                 if len(implementations) == 0:
-                    logging.getLogger(__name__).critical(f'No implementations found for {port} in {self.infrastructure_modules}')
+                    logging.getLogger(self.__class__.__module__).critical(f'No implementations found for {port} in {self.infrastructure_modules}')
                 elif len(implementations) > 1:
-                    logging.getLogger(__name__).critical(f'Several implementations found for {port}: {implementations}')
+                    logging.getLogger(self.__class__.__module__).critical(f'Several implementations found for {port}: {implementations}')
                     mappings.update({ port: implementations[0]() })
                 else:
                     mappings.update({ port: implementations[0]() })
@@ -351,6 +371,7 @@ class PythonEDA():
             EventListener.find_listeners()
             from pythoneda.event_emitter import EventEmitter
             EventEmitter.register_receiver(self)
+            print(f'initialized')
 
     @classmethod
     def delegate_priority(cls, primaryPort) -> int:
@@ -367,6 +388,9 @@ class PythonEDA():
         """
         Notification the application has been launched from the CLI.
         """
+        print(f'primary ports: {self.primary_ports}')
+        logging.getLogger(self.__class__.__module__).info(f'primary ports: {self.primary_ports}')
+
         for primary_port in sorted(self.primary_ports, key=self.__class__.delegate_priority):
             port = primary_port()
             await port.accept(self)
@@ -382,7 +406,7 @@ class PythonEDA():
         result = []
         if event:
             firstEvents = []
-            logging.getLogger(__name__).info(f'Accepting event {event}')
+            logging.getLogger(self.__class__.__module__).info(f'Accepting event {event}')
             from pythoneda.event_listener import EventListener
             EventListener.find_listeners()
             for listenerClass in EventListener.listeners_for(event.__class__):
@@ -426,14 +450,13 @@ class PythonEDA():
 
         for module in cls.instance().infrastructure_modules:
 
-            if module.__name__ == "_log_config":
-#                spec.loader.exec_module(module)
+            if module.__name__ == "pythoneda.infrastructure.logging.logging_config":
                 entry = {}
                 configure_logging_function = getattr(module, "configure_logging", None)
                 if callable(configure_logging_function):
                     result = configure_logging_function
                 else:
-                    print(f"Error in {module.__file__}: configure_logging")
+                    logging.getLogger(cls.__module__).error(f"Error in {module.__file__}: configure_logging")
         return result
 
     @classmethod

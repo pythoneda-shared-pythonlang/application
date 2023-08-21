@@ -169,7 +169,7 @@ def get_adapters(interface, modules: List):
                     if (inspect.isclass(cls)) and (issubclass(cls, interface)) and (cls != interface) and (abc.ABC not in cls.__bases__) and not cls in implementations:
                         implementations.append(cls)
         except ImportError as err:
-            print(f'Error importing {module}: {err}')
+            logging.getLogger(__name__).error(f'Error importing {module}: {err}')
 
     return implementations
 
@@ -197,6 +197,6 @@ def import_submodules(package, recursive=True, type:HexagonalLayer=None):
                     child_package = __import__(full_name, fromlist=[''])
                     results.update(import_submodules(child_package, recursive)) # type is not considered for descendants.
             except ImportError as err:
-                if not ".grpc." in full_name:
-                    print(f'Error importing {full_name}: {err}')
+                if not ".grpc." in full_name and not "logging." in full_name:
+                    logging.getLogger(__name__).error(f'Error importing {full_name}: {err} while loading {package.__path__}')
     return results
