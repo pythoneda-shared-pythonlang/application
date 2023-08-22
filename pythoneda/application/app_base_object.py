@@ -1,7 +1,7 @@
 """
-pythoneda/application/pescio_space.py
+pythoneda/app_base_object.py
 
-This file declares the PescioSpace class.
+This script defines the AppBaseObject class.
 
 Copyright (C) 2023-today rydnr's pythoneda-shared-pythoneda/application
 
@@ -18,23 +18,25 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-from enum import Enum, auto
-from pythoneda.application import AppBaseObject
+import logging
 
-class PescioSpace(AppBaseObject, Enum):
+class AppBaseObject():
     """
-    An enumerated type to identify Carlo Pescio's spaces (https://www.youtube.com/watch?v=WPgYju3KnIY)
+    Ancestor of all pythoneda.application classes.
 
-    Class name: PescioSpace
+    Class name: AppBaseObject
 
     Responsibilities:
-        - Define the different types of spaces.
+        - Define common behavior for all pythoneda.application classes.
 
     Collaborators:
-        - None. But this class is used both by pythoneda.application.bootstrap and pythoneda.application.pythoneda.PythonEDA
+        - None
     """
-
-    DECISION = auto()
-    ARTIFACT = auto()
-    RUNTIME = auto()
-    TENANT = auto()
+    @classmethod
+    def logger(cls):
+        """
+        Retrieves the logger instance.
+        :return: Such instance.
+        :rtype: logging.Logger
+        """
+        return logging.getLogger(cls.__name__)

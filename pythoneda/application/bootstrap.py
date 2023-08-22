@@ -21,16 +21,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import importlib
 import importlib.util
 import inspect
-import logging
 import os
 from pathlib import Path
 import pkgutil
-from pythoneda.application.hexagonal_layer import HexagonalLayer
+from pythoneda.application import AppBaseObject, HexagonalLayer
 import sys
 from typing import Callable, Dict, List
 import warnings
 
-class Bootstrap():
+class Bootstrap(AppBaseObject):
 
     """
     Provides logic required to bootstrapping PythonEDA applications.
@@ -178,7 +177,7 @@ class Bootstrap():
                         else:
                             result.append(self)
             except ImportError:
-                logging.getLogger(Bootstrap.__module__).critical(f'Cannot get members of {module}')
+                Bootstrap.logger().critical(f'Cannot get members of {module}')
                 pass
         return result
 
@@ -203,7 +202,7 @@ class Bootstrap():
                         if (inspect.isclass(self)) and (issubclass(self, interface)) and (self != interface) and (abc.ABC not in self.__bases__) and not self in implementations:
                             implementations.append(self)
             except ImportError as err:
-                logging.getLogger(Bootstrap.__module__).error(f'(a) Error importing {module}: {err}')
+                Bootstrap.logger().error(f'Error importing {module}: {err}')
 
         return implementations
 
@@ -230,5 +229,5 @@ class Bootstrap():
                         results.update(self.import_submodules(child_package, recursive)) # type is not considered for descendants.
                 except ImportError as err:
                     if not ".grpc." in full_name and not ".logging." in full_name and not ".git.":
-                        logging.getLogger(Bootstrap.__module__).error(f'(b) Error importing {full_name}: {err} while loading {package.__path__}')
+                        Bootstrap.logger().error(f'Error importing {full_name}: {err} while loading {package.__path__}')
         return results

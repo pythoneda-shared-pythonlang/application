@@ -22,13 +22,13 @@ import logging
 import os
 from pathlib import Path
 import pkgutil
-from pythoneda.application import Bootstrap, HexagonalLayer
+from pythoneda.application import AppBaseObject, Bootstrap, HexagonalLayer
 from pythoneda.banner import Banner
 import sys
 from typing import Callable, Dict, List
 import warnings
 
-class PythonEDA():
+class PythonEDA(AppBaseObject):
     """
     The glue that binds adapters from infrastructure layer to ports in the domain layer.
 
@@ -172,8 +172,8 @@ class PythonEDA():
                 except ModuleNotFoundError as err:
                     import traceback
                     traceback.print_exc()
-                    logging.getLogger(PythonEDA.__module__).critical(f'Cannot import {pkg.__package__}: Missing dependency {err.name} !!')
-                    logging.getLogger(PythonEDA.__module__).critical(err)
+                    PythonEDA.logger().critical(f'Cannot import {pkg.__package__}: Missing dependency {err.name} !!')
+                    PythonEDA.logger().critical(err)
         return result
 
     def load_all_packages(self):
@@ -189,11 +189,11 @@ class PythonEDA():
                         try:
                             loader.load_module(pkg)
                         except Exception as err:
-                            logging.getLogger(PythonEDA.__module__).critical(f'Cannot import {pkg}: Missing dependency {err.name}')
-                            logging.getLogger(PythonEDA.__module__).critical(err)
+                            PythonEDA.logger().critical(f'Cannot import {pkg}: Missing dependency {err.name}')
+                            PythonEDA.logger().critical(err)
 
         self.load_module_recursive('pythoneda')
-        logging.getLogger(PythonEDA.__module__).info('PythonEDA packages loaded')
+        PythonEDA.logger().info('PythonEDA packages loaded')
 
     def load_module_recursive(self, name):
         """
@@ -202,7 +202,7 @@ class PythonEDA():
         try:
             # Try to load the module/package
             module = __import__(name, fromlist=[''])
-            logging.getLogger(PythonEDA.__module__).debug(f'Loaded {name}')
+            PythonEDA.logger().debug(f'Loaded {name}')
 
             # If it's a package, discover its submodules and load them
             if pkgutil.get_loader(name).is_package(name):
@@ -211,8 +211,8 @@ class PythonEDA():
                     self.load_module_recursive(f"{name}.{mod_name}")
 
         except ImportError as err:
-            logging.getLogger(PythonEDA.__module__).critical(f'Cannot import {name}: Missing dependency {err.name}')
-            logging.getLogger(PythonEDA.__module__).critical(err)
+            PythonEDA.logger().critical(f'Cannot import {name}: Missing dependency {err.name}')
+            PythonEDA.logger().critical(err)
 
     def custom_sort(self, item):
         split_item = item.split(".")
@@ -336,8 +336,8 @@ class PythonEDA():
                 except Exception as err:
                     import traceback
                     traceback.print_exc()
-                    logging.getLogger(PythonEDA.__module__).critical(f'Cannot import {package_path}: Missing dependency {err} when trying to import {package_name}!!')
-                    logging.getLogger(PythonEDA.__module__).critical(err)
+                    PythonEDA.logger().critical(f'Cannot import {package_path}: Missing dependency {err} when trying to import {package_name}!!')
+                    PythonEDA.logger().critical(err)
 
         return (domain_packages, domain_modules, infrastructure_packages, infrastructure_modules)
 
@@ -407,14 +407,14 @@ class PythonEDA():
         """
         mappings = {}
         if len(self.infrastructure_modules) == 0:
-            logging.getLogger(PythonEDA.__module__).critical(f'No infrastructure modules detected!')
+            PythonEDA.logger().critical(f'No infrastructure modules detected!')
         else:
             for port in self.domain_ports:
                 implementations = Bootstrap.instance().get_adapters(port, self.infrastructure_modules)
                 if len(implementations) == 0:
-                    logging.getLogger(PythonEDA.__module__).info(f'No implementations found for {port} in {self.infrastructure_modules}')
+                    PythonEDA.logger().info(f'No implementations found for {port} in {self.infrastructure_modules}')
                 elif len(implementations) > 1:
-                    logging.getLogger(PythonEDA.__module__).info(f'Several implementations found for {port}: {implementations}. Using {implementations[0]}')
+                    PythonEDA.logger().info(f'Several implementations found for {port}: {implementations}. Using {implementations[0]}')
                     mappings.update({ port: implementations[0]() })
                 else:
                     mappings.update({ port: implementations[0]() })
@@ -442,7 +442,7 @@ class PythonEDA():
         """
         Notification the application has been launched from the CLI.
         """
-        logging.getLogger(PythonEDA.__module__).info(f'primary ports: {self.primary_ports}')
+        PythonEDA.logger().info(f'primary ports: {self.primary_ports}')
 
         for primary_port in sorted(self.primary_ports, key=self.__class__.delegate_priority):
             port = primary_port()
@@ -459,7 +459,7 @@ class PythonEDA():
         result = []
         if event:
             firstEvents = []
-            logging.getLogger(PythonEDA.__module__).info(f'(a) Accepting event {event}')
+            PythonEDA.logger().info(f'Accepting event {event}')
             from pythoneda.event_listener import EventListener
             EventListener.find_listeners()
             for listenerClass in EventListener.listeners_for(event.__class__):
@@ -509,7 +509,7 @@ class PythonEDA():
                 if callable(configure_logging_function):
                     result = configure_logging_function
                 else:
-                    logging.getLogger(cls.__module__).error(f"Error in {module.__file__}: configure_logging")
+                    PythonEDA.logger().error(f"Error in {module.__file__}: configure_logging")
         return result
 
     @classmethod
@@ -537,7 +537,6 @@ from pythoneda.application import bootstrap
 import asyncio
 import importlib
 import importlib.util
-import logging
 import os
 import sys
 
