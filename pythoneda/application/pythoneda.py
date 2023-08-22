@@ -59,6 +59,7 @@ class PythonEDA():
         if banner:
             banner.print()
         self.fix_syspath(file)
+        self.sort_pythoneda_package_in_sys_path()
         self.load_all_packages()
         self._domain_packages, self._domain_modules, self._infrastructure_packages, self._infrastructure_modules = self.load_pythoneda_packages()
         self._domain_ports = self.find_domain_ports(self._domain_modules)
@@ -117,6 +118,15 @@ class PythonEDA():
         :rtype: List
         """
         return self._primary_ports
+
+    def sort_pythoneda_package_in_sys_path(self):
+        """
+        Sorts sys.path so that the pythoneda package is provided by the actual root package.
+        """
+        rootModule = self.find_actual_root_pythoneda_package_path()
+        root = os.path.dirname(rootModule)
+        sys.path.remove(root)
+        sys.path.insert(0, root)
 
     def fix_syspath(self, file: str):
         """
@@ -237,6 +247,22 @@ class PythonEDA():
         # Condition to make sure __init__.py is the only py file and there are subdirectories
         return has_init and has_subfolders and not has_other_py_files
 
+    def find_actual_root_pythoneda_package_path(self) -> str:
+        """
+        Retrieves the path of the actual root Pythoneda package.
+        :return: Such package.
+        :rtype: str
+        """
+        result = None
+        for path in sys.path:
+            init_file = Path(path) / "pythoneda" / Path("__init__.py")
+            event_file = Path(path) / "pythoneda" / Path("event.py")
+            port_file = Path(path) / "pythoneda" / Path("port.py")
+            if os.path.exists(init_file) and os.path.exists(event_file) and os.path.exists(port_file):
+                result = str(Path(path) / "pythoneda")
+                break
+        return result
+
     def get_path_of_packages_under_namespace(self, namespace:str) -> Dict:
         """
         Retrieves the paths of packages under given namespace.
@@ -245,7 +271,7 @@ class PythonEDA():
         :return: A dictionary of package names and paths.
         :rtype: Dict[str, str]
         """
-        all_sub_packages = {}
+        result = {}
 
         for path in sys.path:
             init_file = Path(path) / "pythoneda" / Path("__init__.py")
@@ -267,10 +293,12 @@ class PythonEDA():
                             package_name = full_path[len(path)+1:].replace(os.sep, '.')
 
                             # if the package is a sub-package of the namespace
-                            if package_name.startswith(namespace) and not all_sub_packages.get(package_name, None):
-                                all_sub_packages[package_name] = full_path
+                            if package_name.startswith(namespace) and not result.get(package_name, False):
+                                result[package_name] = full_path
 
-        return all_sub_packages
+        result['pythoneda'] = self.find_actual_root_pythoneda_package_path()
+
+        return result
 
     def load_pythoneda_packages(self) -> tuple:
         """
@@ -289,9 +317,10 @@ class PythonEDA():
             for package_name in packages:
                 try:
                     package = __import__(package_name, fromlist=[''])
+                    package = importlib.reload(package)
                     package_path = packages[package_name]
-                    domain_package = bootstrap.is_domain_package(package)
-                    infrastructure_package = bootstrap.is_infrastructure_package(package)
+                    domain_package = bootstrap.is_domain_package(package_path)
+                    infrastructure_package = bootstrap.is_infrastructure_package(package_path)
                     if domain_package:
                         if package_path not in domain_packages:
                             domain_packages.append(package_path)
@@ -357,9 +386,9 @@ class PythonEDA():
             for port in self.domain_ports:
                 implementations = bootstrap.get_adapters(port, self.infrastructure_modules)
                 if len(implementations) == 0:
-                    logging.getLogger(self.__class__.__module__).critical(f'No implementations found for {port} in {self.infrastructure_modules}')
+                    logging.getLogger(self.__class__.__module__).info(f'No implementations found for {port} in {self.infrastructure_modules}')
                 elif len(implementations) > 1:
-                    logging.getLogger(self.__class__.__module__).critical(f'Several implementations found for {port}: {implementations}')
+                    logging.getLogger(self.__class__.__module__).info(f'Several implementations found for {port}: {implementations}. Using {implementations[0]}')
                     mappings.update({ port: implementations[0]() })
                 else:
                     mappings.update({ port: implementations[0]() })

@@ -27,28 +27,53 @@ from pathlib import Path
 import pkgutil
 from pythoneda.application.hexagonal_layer import HexagonalLayer
 import sys
-from typing import Dict, List
+from typing import Callable, Dict, List
 import warnings
 
-def is_domain_package(package) -> bool:
+_domain_packages = {}
+_infrastructure_packages = {}
+_domain_modules = {}
+_infrastructure_modules = {}
+
+def _memoized(packagePath:str, type, cache:Dict, func:Callable) -> bool:
+    """
+    Retrieves whether given package matches a condition provided by `func`, using a cache to avoid redundant processing.
+    :param packagePath: The path of the package to check.
+    :type packagePath: str
+    :param type: The aspect of the package to check.
+    :type type: pythoneda.HexagonalLayer
+    :param cache: The cache.
+    :type cache: Dict.
+    :param func: The function to call to process the package.
+    :type func: Callable
+    :return: True if so.
+    :rtype: bool
+    """
+    result = cache.get(packagePath, None)
+    if result is None:
+        result = func(packagePath, type)
+        cache[packagePath] = result
+    return result
+
+def is_domain_package(packagePath) -> bool:
     """
     Checks if given package is marked as domain package.
-    :type package: builtins.module
-    :type package: package
+    :param packagePath: The package path.
+    :type packagePath: str
     :return: True if so.
     :rtype: bool
     """
-    return is_package_of_type(package, HexagonalLayer.DOMAIN)
+    return _memoized(packagePath, HexagonalLayer.DOMAIN, _domain_packages, is_of_type)
 
-def is_infrastructure_package(package) -> bool:
+def is_infrastructure_package(packagePath:str) -> bool:
     """
     Checks if given package is marked as infrastructure package.
-    :param package: The package.
-    :type package: builtins.module
+    :param packagePath: The package path.
+    :type packagePath: str
     :return: True if so.
     :rtype: bool
     """
-    return is_package_of_type(package, HexagonalLayer.INFRASTRUCTURE)
+    return _memoized(packagePath, HexagonalLayer.INFRASTRUCTURE, _infrastructure_packages, is_of_type)
 
 def get_folders_of_parent_packages(path) -> List:
     """
@@ -58,23 +83,27 @@ def get_folders_of_parent_packages(path) -> List:
     :return: The parent folders.
     :rtype: List
     """
-    current_path = path
+    folder = path.rstrip("/")
+    if not os.path.isdir(folder):
+        folder = os.path.dirname(folder)
+
+    current_path = folder
     while (Path(current_path) / "__init__.py").exists() and current_path != os.path.dirname(current_path):
         yield current_path
         current_path = os.path.dirname(current_path)
 
-def is_package_of_type(package, type: HexagonalLayer) -> bool:
+def is_of_type(path:str, type: HexagonalLayer) -> bool:
     """
-    Checks if given package is marked as of given type.
-    :param package: The package.
-    :type package: builtins.module
+    Checks if given path is marked as of given type.
+    :param path: The package path.
+    :type path: str
     :param type: The type of package.
     :type type: pythoneda.application.hexagonal_layer.HexagonalLayer
     :return: True if so.
     :rtype: bool
     """
     result = False
-    for folder in get_folders_of_parent_packages(package.__path__[0]):
+    for folder in get_folders_of_parent_packages(path):
         if (Path(folder) / f".pythoneda-{type.name.lower()}").exists():
             result = True
             break
@@ -89,7 +118,7 @@ def is_domain_module(module) -> bool:
     :return: True if so.
     :rtype: bool
     """
-    return is_module_of_type(module, HexagonalLayer.DOMAIN)
+    return _memoized(module.__file__, HexagonalLayer.DOMAIN, _domain_modules, is_of_type)
 
 def is_infrastructure_module(module) -> bool:
     """
@@ -99,25 +128,7 @@ def is_infrastructure_module(module) -> bool:
     :return: True if so.
     :rtype: bool
     """
-    return is_module_of_type(module, HexagonalLayer.INFRASTRUCTURE)
-
-def is_module_of_type(module, type: HexagonalLayer) -> bool:
-    """
-    Checks if given module is marked as of given type.
-    :param module: The module.
-    :type module: builtins.module
-    :param type: The type of module.
-    :type type: pythoneda.application.hexagonal_layer.HexagonalLayer
-    :return: True if so.
-    :rtype: bool
-    """
-    result = False
-    for folder in get_folders_of_parent_packages(os.path.dirname(module.__file__)):
-        if (Path(folder) / f".pythoneda-{type.name.lower()}").exists():
-            result = True
-            break
-
-    return result
+    return _memoized(module.__file__, HexagonalLayer.INFRASTRUCTURE, _domain_modules, is_of_type)
 
 def get_interfaces_of_module(iface, module, excluding=None):
     """
@@ -187,10 +198,11 @@ def import_submodules(package, recursive=True, type:HexagonalLayer=None):
     """
     results = {}
 
-    if type is None or is_package_of_type(package, type):
+    if type is None or is_of_type(package.__path__[0], type):
         for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
             full_name = package.__name__ + '.' + name
             try:
+
                 results[full_name] = __import__(full_name, fromlist=[''])
 
                 if recursive and is_pkg:
