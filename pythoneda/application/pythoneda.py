@@ -371,7 +371,6 @@ class PythonEDA():
             EventListener.find_listeners()
             from pythoneda.event_emitter import EventEmitter
             EventEmitter.register_receiver(self)
-            print(f'initialized')
 
     @classmethod
     def delegate_priority(cls, primaryPort) -> int:
@@ -388,7 +387,6 @@ class PythonEDA():
         """
         Notification the application has been launched from the CLI.
         """
-        print(f'primary ports: {self.primary_ports}')
         logging.getLogger(self.__class__.__module__).info(f'primary ports: {self.primary_ports}')
 
         for primary_port in sorted(self.primary_ports, key=self.__class__.delegate_priority):
