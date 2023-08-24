@@ -19,13 +19,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from enum import Enum, auto
-from pythoneda import BaseObject
 
-class ArchitecturalRole(BaseObject, Enum):
+class ArchitecturalRole(Enum):
     """
     An enumerated type to identify the different roles each repository plays architecture-wise.
 
-    Class name: ArchitecturalRol
+    Class name: ArchitecturalRole
 
     Responsibilities:
         - Define the different types of architectural roles.

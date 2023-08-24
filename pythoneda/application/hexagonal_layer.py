@@ -19,9 +19,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from enum import Enum, auto
-from pythoneda import BaseObject
 
-class HexagonalLayer(BaseObject, Enum):
+class HexagonalLayer(Enum):
     """
     An enumerated type to identify layers in hexagonal architectures.
 

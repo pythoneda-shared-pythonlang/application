@@ -22,14 +22,13 @@ import logging
 import os
 from pathlib import Path
 import pkgutil
-from pythoneda import BaseObject
 from pythoneda.application import Bootstrap, HexagonalLayer
 from pythoneda.banner import Banner
 import sys
 from typing import Callable, Dict, List
 import warnings
 
-class PythonEDA(BaseObject):
+class PythonEDA():
     """
     The glue that binds adapters from infrastructure layer to ports in the domain layer.
 
@@ -173,8 +172,7 @@ class PythonEDA(BaseObject):
                 except ModuleNotFoundError as err:
                     import traceback
                     traceback.print_exc()
-                    PythonEDA.logger().critical(f'Cannot import {pkg.__package__}: Missing dependency {err.name} !!')
-                    PythonEDA.logger().critical(err)
+                    sys.stderr.write(f'Cannot import {pkg.__package__}: Missing dependency {err.name}\n')
         return result
 
     def load_all_packages(self):
@@ -190,11 +188,9 @@ class PythonEDA(BaseObject):
                         try:
                             loader.load_module(pkg)
                         except Exception as err:
-                            PythonEDA.logger().critical(f'Cannot import {pkg}: Missing dependency {err.name}')
-                            PythonEDA.logger().critical(err)
+                            sys.stderr.write(f'Cannot import {pkg}: Missing dependency {err.name}\n')
 
         self.load_module_recursive('pythoneda')
-        PythonEDA.logger().info('PythonEDA packages loaded')
 
     def load_module_recursive(self, name):
         """
@@ -203,7 +199,6 @@ class PythonEDA(BaseObject):
         try:
             # Try to load the module/package
             module = __import__(name, fromlist=[''])
-            PythonEDA.logger().debug(f'Loaded {name}')
 
             # If it's a package, discover its submodules and load them
             if pkgutil.get_loader(name).is_package(name):
@@ -212,8 +207,7 @@ class PythonEDA(BaseObject):
                     self.load_module_recursive(f"{name}.{mod_name}")
 
         except ImportError as err:
-            PythonEDA.logger().critical(f'Cannot import {name}: Missing dependency {err.name}')
-            PythonEDA.logger().critical(err)
+            sys.stderr.write(f'Cannot import {name}: Missing dependency {err.name}\n')
 
     def custom_sort(self, item):
         split_item = item.split(".")
@@ -337,8 +331,7 @@ class PythonEDA(BaseObject):
                 except Exception as err:
                     import traceback
                     traceback.print_exc()
-                    PythonEDA.logger().critical(f'Cannot import {package_path}: Missing dependency {err} when trying to import {package_name}!!')
-                    PythonEDA.logger().critical(err)
+                    sys.stderr.write(f'Cannot import {package_path}: Missing dependency {err} when trying to import {package_name}\n')
 
         return (domain_packages, domain_modules, infrastructure_packages, infrastructure_modules)
 
@@ -408,14 +401,14 @@ class PythonEDA(BaseObject):
         """
         mappings = {}
         if len(self.infrastructure_modules) == 0:
-            PythonEDA.logger().critical(f'No infrastructure modules detected!')
+            sys.stderr.write('No infrastructure modules detected!\n')
         else:
             for port in self.domain_ports:
                 implementations = Bootstrap.instance().get_adapters(port, self.infrastructure_modules)
                 if len(implementations) == 0:
-                    PythonEDA.logger().info(f'No implementations found for {port} in {self.infrastructure_modules}')
+                    sys.stderr.write(f'No implementations found for {port} in {self.infrastructure_modules}\n')
                 elif len(implementations) > 1:
-                    PythonEDA.logger().info(f'Several implementations found for {port}: {implementations}. Using {implementations[0]}')
+                    sys.stderr.write(f'Several implementations found for {port}: {implementations}. Using {implementations[0]}\n')
                     mappings.update({ port: implementations[0]() })
                 else:
                     mappings.update({ port: implementations[0]() })
@@ -443,8 +436,6 @@ class PythonEDA(BaseObject):
         """
         Notification the application has been launched from the CLI.
         """
-        PythonEDA.logger().info(f'primary ports: {self.primary_ports}')
-
         for primary_port in sorted(self.primary_ports, key=self.__class__.delegate_priority):
             port = primary_port()
             await port.accept(self)
@@ -460,7 +451,6 @@ class PythonEDA(BaseObject):
         result = []
         if event:
             firstEvents = []
-            PythonEDA.logger().info(f'Accepting event {event}')
             from pythoneda.event_listener import EventListener
             EventListener.find_listeners()
             for listenerClass in EventListener.listeners_for(event.__class__):
@@ -510,7 +500,7 @@ class PythonEDA(BaseObject):
                 if callable(configure_logging_function):
                     result = configure_logging_function
                 else:
-                    PythonEDA.logger().error(f"Error in {module.__file__}: configure_logging")
+                    sys.stderr.write(f"Error in {module.__file__}: configure_logging\n")
         return result
 
     @classmethod

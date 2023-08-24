@@ -24,14 +24,12 @@ import inspect
 import os
 from pathlib import Path
 import pkgutil
-from pythoneda import BaseObject
 from pythoneda.application import HexagonalLayer
 import sys
 from typing import Callable, Dict, List
 import warnings
 
-class Bootstrap(BaseObject):
-
+class Bootstrap():
     """
     Provides logic required to bootstrapping PythonEDA applications.
 
@@ -178,7 +176,7 @@ class Bootstrap(BaseObject):
                         else:
                             result.append(self)
             except ImportError:
-                Bootstrap.logger().critical(f'Cannot get members of {module}')
+                stderr.write(f'Cannot get members of {module}\n')
                 pass
         return result
 
