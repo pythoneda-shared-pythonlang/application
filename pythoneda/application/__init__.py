@@ -20,7 +20,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 __path__ = __import__('pkgutil').extend_path(__path__, __name__)
 
-from .app_base_object import AppBaseObject
 from .architectural_role import ArchitecturalRole
 from .hexagonal_layer import HexagonalLayer
 from .pescio_space import PescioSpace
