@@ -19,9 +19,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from enum import Enum, auto
-from pythoneda.application import AppBaseObject
+from pythoneda import BaseObject
 
-class PescioSpace(AppBaseObject, Enum):
+class PescioSpace(BaseObject, Enum):
     """
     An enumerated type to identify Carlo Pescio's spaces (https://www.youtube.com/watch?v=WPgYju3KnIY)
 

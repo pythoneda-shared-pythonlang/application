@@ -24,12 +24,13 @@ import inspect
 import os
 from pathlib import Path
 import pkgutil
-from pythoneda.application import AppBaseObject, HexagonalLayer
+from pythoneda import BaseObject
+from pythoneda.application import HexagonalLayer
 import sys
 from typing import Callable, Dict, List
 import warnings
 
-class Bootstrap(AppBaseObject):
+class Bootstrap(BaseObject):
 
     """
     Provides logic required to bootstrapping PythonEDA applications.

@@ -22,13 +22,14 @@ import logging
 import os
 from pathlib import Path
 import pkgutil
-from pythoneda.application import AppBaseObject, Bootstrap, HexagonalLayer
+from pythoneda import BaseObject
+from pythoneda.application import Bootstrap, HexagonalLayer
 from pythoneda.banner import Banner
 import sys
 from typing import Callable, Dict, List
 import warnings
 
-class PythonEDA(AppBaseObject):
+class PythonEDA(BaseObject):
     """
     The glue that binds adapters from infrastructure layer to ports in the domain layer.
 
