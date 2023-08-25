@@ -378,11 +378,15 @@ class PythonEDA():
             PythonEDA._default_logging_configured = True
 
     @classmethod
-    async def main(cls):
+    async def main(cls, name:str):
         """
         Runs the application from the command line.
+        :param name: The application name.
+        :type name: str
         """
+        sys.stdout.write(f'Starting {name} ...\n')
         await cls.instance().accept_input()
+        sys.stdout.write(f'Exiting {name} ...\n')
 
     @classmethod
     def instance(cls):
@@ -406,7 +410,8 @@ class PythonEDA():
             for port in self.domain_ports:
                 implementations = Bootstrap.instance().get_adapters(port, self.infrastructure_modules)
                 if len(implementations) == 0:
-                    sys.stderr.write(f'No implementations found for {port} in {self.infrastructure_modules}\n')
+                    if str(port.__module__) != 'pythoneda.repo':
+                        sys.stderr.write(f'No implementations found for {port} in {self.infrastructure_modules}\n')
                 elif len(implementations) > 1:
                     sys.stderr.write(f'Several implementations found for {port}: {implementations}. Using {implementations[0]}\n')
                     mappings.update({ port: implementations[0]() })
@@ -481,7 +486,7 @@ class PythonEDA():
         """
         module_function = self.__class__.get_log_config()
         if module_function:
-            module_function(logConfig["verbose"], logConfig["trace"], logConfig["quiet"])
+            module_function(logConfig["info"], logConfig["verbose"], logConfig["quiet"])
 
     @classmethod
     def get_log_config(cls) -> Callable:
@@ -533,4 +538,4 @@ import sys
 
 if __name__ == "__main__":
 
-    asyncio.run(PythonEDA.main())
+    asyncio.run(PythonEDA.main('pythoneda.application.PythonEDA'))
