@@ -172,7 +172,11 @@ class PythonEDA():
                 except ModuleNotFoundError as err:
                     import traceback
                     traceback.print_exc()
-                    sys.stderr.write(f'Cannot import {pkg.__package__}: Missing dependency {err.name}\n')
+                    if hasattr(err, "name"):
+                        message = f'Cannot import {pkg.__package__}: Missing dependency {err.name}\n'
+                    else:
+                        message = f'Cannot import {pkg.__package__}: {err}\n'
+                    sys.stderr.write(message)
         return result
 
     def load_all_packages(self):
@@ -188,7 +192,11 @@ class PythonEDA():
                         try:
                             loader.load_module(pkg)
                         except Exception as err:
-                            sys.stderr.write(f'Cannot import {pkg}: Missing dependency {err.name}\n')
+                            if hasattr(err, "name"):
+                                message = f'Cannot import {pkg.__package__}: Missing dependency {err.name}\n'
+                            else:
+                                message = f'Cannot import {pkg}: {err}\n'
+                            sys.stderr.write(message)
 
         self.load_module_recursive('pythoneda')
 
@@ -422,7 +430,6 @@ class PythonEDA():
             from pythoneda.primary_port import PrimaryPort
             self._primary_ports = Bootstrap.instance().get_adapters(PrimaryPort, self.infrastructure_modules)
             from pythoneda.event_listener import EventListener
-            EventListener.find_listeners()
             from pythoneda.event_emitter import EventEmitter
             EventEmitter.register_receiver(self)
 
@@ -457,7 +464,6 @@ class PythonEDA():
         if event:
             firstEvents = []
             from pythoneda.event_listener import EventListener
-            EventListener.find_listeners()
             for listenerClass in EventListener.listeners_for(event.__class__):
                 resultingEvents = await listenerClass.accept(event)
                 if resultingEvents and len(resultingEvents) > 0:
