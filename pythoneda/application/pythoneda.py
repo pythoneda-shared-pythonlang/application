@@ -393,7 +393,9 @@ class PythonEDA():
         :type name: str
         """
         sys.stdout.write(f'Starting {name} ...\n')
-        await cls.instance().accept_input()
+        instance = cls.instance()
+        await instance.after_bootstrap()
+        await instance.accept_input()
         sys.stdout.write(f'Exiting {name} ...\n')
 
     @classmethod
@@ -451,6 +453,12 @@ class PythonEDA():
         for primary_port in sorted(self.primary_ports, key=self.__class__.delegate_priority):
             port = primary_port()
             await port.accept(self)
+
+    async def after_bootstrap(self):
+        """
+        Hook to run code after the bootstrap process.
+        """
+        pass
 
     async def accept(self, event): # : Event) -> Event:
         """
