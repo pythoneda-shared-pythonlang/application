@@ -30,10 +30,11 @@ class ArchitecturalRole(Enum):
         - Define the different types of architectural roles.
 
     Collaborators:
-        - None. But this class is used both by pythoneda.application.bootstrap and pythoneda.application.PythonEDA
+        - None. But this class is used both by pythoneda.application.Bootstrap and pythoneda.application.PythonEDA
     """
 
     BOUNDED_CONTEXT = auto()
     EVENT = auto()
     SHARED_KERNEL = auto()
     REALM = auto()
+    CODE_REQUEST = auto()
