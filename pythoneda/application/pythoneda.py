@@ -468,13 +468,9 @@ class PythonEDA():
     async def accept_input(self):
         """
         Notification the application has been launched from the CLI.
-        Current implementation assumes the "one-shot" applies to the next PrimaryPort
-        after pythoneda.infrastructure.cli.OneShotCli. The order can be customized via priorities.
         """
-        previous_one_shot = self.one_shot
-        one_shot_changed = False
         for primary_port in sorted(self.primary_ports, key=self.__class__.delegate_priority):
-            if not self.one_shot or one_shot_changed:
+            if not self.one_shot or port.is_one_shot_compatible:
                 previous_one_shot = self.one_shot
                 port = primary_port()
                 await port.accept(self)
