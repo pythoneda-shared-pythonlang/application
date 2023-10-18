@@ -65,6 +65,7 @@ class PythonEDA():
         self.load_all_packages()
         self._domain_packages, self._domain_modules, self._infrastructure_packages, self._infrastructure_modules = self.load_pythoneda_packages()
         self._domain_ports = self.find_domain_ports(self._domain_modules)
+        self._one_shot = False
         self.initialize()
 
     @property
@@ -120,6 +121,24 @@ class PythonEDA():
         :rtype: List
         """
         return self._primary_ports
+
+    @property
+    def one_shot(self) -> bool:
+        """
+        Retrieves whether one-shot behaviour is specified.
+        :return: Such flag.
+        :rtype: bool
+        """
+        return self._one_shot
+
+    @one_shot.setter
+    def one_shot(self, value:bool):
+        """
+        Specifies whether one-shot behavior is active.
+        :param value: Whether to activate such behavior.
+        :type value: bool
+        """
+        self._one_shot = value
 
     def sort_pythoneda_package_in_sys_path(self):
         """
@@ -449,10 +468,17 @@ class PythonEDA():
     async def accept_input(self):
         """
         Notification the application has been launched from the CLI.
+        Current implementation assumes the "one-shot" applies to the next PrimaryPort
+        after pythoneda.infrastructure.cli.OneShotCli. The order can be customized via priorities.
         """
+        previous_one_shot = self.one_shot
+        one_shot_changed = False
         for primary_port in sorted(self.primary_ports, key=self.__class__.delegate_priority):
-            port = primary_port()
-            await port.accept(self)
+            if not self.one_shot or one_shot_changed:
+                previous_one_shot = self.one_shot
+                port = primary_port()
+                await port.accept(self)
+                one_shot_changed = previous_one_shot != self.one_shot
 
     async def after_bootstrap(self):
         """
@@ -501,6 +527,14 @@ class PythonEDA():
         module_function = self.__class__.get_log_config()
         if module_function:
             module_function(logConfig["info"], logConfig["verbose"], logConfig["quiet"])
+
+    async def accept_one_shot(self, flag:bool):
+        """
+        Marks one-shot behavior as active or inactive.
+        :param flag: Such behavior.
+        :type flag: bool
+        """
+        self.one_shot = flag
 
     @classmethod
     def get_log_config(cls) -> Callable:
