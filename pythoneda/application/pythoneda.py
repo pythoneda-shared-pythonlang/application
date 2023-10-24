@@ -192,7 +192,7 @@ class PythonEDA():
                     import traceback
                     traceback.print_exc()
                     if hasattr(err, "name"):
-                        message = f'Cannot import {pkg.__package__}: Missing dependency {err.name}\n'
+                        message = f'Cannot import {pkg.__package__}: Missing dependency {err.name} ({err})\n'
                     else:
                         message = f'Cannot import {pkg.__package__}: {err}\n'
                     sys.stderr.write(message)
@@ -212,7 +212,7 @@ class PythonEDA():
                             loader.load_module(pkg)
                         except Exception as err:
                             if hasattr(err, "name"):
-                                message = f'Cannot import {pkg.__package__}: Missing dependency {err.name}\n'
+                                message = f'Cannot import {pkg.__package__}: Missing dependency {err.name} ({err})\n'
                             else:
                                 message = f'Cannot import {pkg}: {err}\n'
                             sys.stderr.write(message)
@@ -234,7 +234,7 @@ class PythonEDA():
                     self.load_module_recursive(f"{name}.{mod_name}")
 
         except ImportError as err:
-            sys.stderr.write(f'Cannot import {name}: Missing dependency {err.name}\n')
+            sys.stderr.write(f'Cannot import {name}: Missing dependency {err.name} {err}\n')
 
     def custom_sort(self, item):
         split_item = item.split(".")
@@ -470,7 +470,7 @@ class PythonEDA():
         Notification the application has been launched from the CLI.
         """
         for primary_port in sorted(self.primary_ports, key=self.__class__.delegate_priority):
-            if not self.one_shot or port.is_one_shot_compatible:
+            if not self.one_shot or primary_port.is_one_shot_compatible:
                 previous_one_shot = self.one_shot
                 port = primary_port()
                 await port.accept(self)
@@ -492,16 +492,18 @@ class PythonEDA():
         """
         result = []
         if event:
-            firstEvents = []
-            from pythoneda.event_listener import EventListener
-            for listenerClass in EventListener.listeners_for(event.__class__):
-                resultingEvents = await listenerClass.accept(event)
-                if resultingEvents and len(resultingEvents) > 0:
-                    self.__class__.extend_missing_items(firstEvents, resultingEvents)
-            if len(firstEvents) > 0:
-                self.__class__.extend_missing_items(result, firstEvents)
-                for event in firstEvents:
-                    self.__class__.extend_missing_items(result, await self.accept(event))
+            first_events = []
+            from pythoneda import EventListener, PrimaryPort
+            for listener_class in EventListener.listeners_for(event.__class__):
+                if not self.one_shot or (not issubclass(listener_class, PrimaryPort) or listener_class.is_one_shot_compatible):
+                    resulting_events = await listener_class.accept(event)
+                    if resulting_events and len(resulting_events) > 0:
+                        self.__class__.extend_missing_items(first_events, resulting_events)
+            if len(first_events) > 0:
+                self.__class__.extend_missing_items(result, first_events)
+        for evt in result:
+            await self.emit(evt)
+
         return result
 
     async def emit(self, event):
@@ -511,7 +513,9 @@ class PythonEDA():
         :type event: pythoneda.Event
         """
         if event:
+            from pythoneda import EventEmitter, Ports
             event_emitter = Ports.instance().resolve(EventEmitter)
+            print(f'emitting {event}')
             await event_emitter.emit(event)
 
     async def accept_configure_logging(self, logConfig: Dict[str, bool]):
