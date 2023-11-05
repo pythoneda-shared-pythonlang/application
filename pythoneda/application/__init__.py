@@ -18,10 +18,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-__path__ = __import__('pkgutil').extend_path(__path__, __name__)
+__path__ = __import__("pkgutil").extend_path(__path__, __name__)
 
-from .architectural_role import ArchitecturalRole
-from .hexagonal_layer import HexagonalLayer
-from .pescio_space import PescioSpace
 from .bootstrap import Bootstrap
 from .pythoneda import PythonEDA

@@ -18,17 +18,20 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+from .bootstrap import Bootstrap
+import inspect
 import logging
 import os
 from pathlib import Path
 import pkgutil
-from pythoneda.application import Bootstrap, HexagonalLayer
+from pythoneda.shared.artifact import HexagonalLayer
 from pythoneda.banner import Banner
 import sys
 from typing import Callable, Dict, List
 import warnings
 
-class PythonEDA():
+
+class PythonEDA:
     """
     The glue that binds adapters from infrastructure layer to ports in the domain layer.
 
@@ -63,7 +66,12 @@ class PythonEDA():
         self.fix_syspath(file)
         self.sort_pythoneda_package_in_sys_path()
         self.load_all_packages()
-        self._domain_packages, self._domain_modules, self._infrastructure_packages, self._infrastructure_modules = self.load_pythoneda_packages()
+        (
+            self._domain_packages,
+            self._domain_modules,
+            self._infrastructure_packages,
+            self._infrastructure_modules,
+        ) = self.load_pythoneda_packages()
         self._domain_ports = self.find_domain_ports(self._domain_modules)
         self._one_shot = False
         self.initialize()
@@ -84,7 +92,7 @@ class PythonEDA():
         :return: Such modules.
         :rtype: List
         """
-        return self._domain_modules;
+        return self._domain_modules
 
     @property
     def domain_ports(self) -> List:
@@ -93,7 +101,7 @@ class PythonEDA():
         :return: Such interfaces.
         :rtype: List
         """
-        return self._domain_ports;
+        return self._domain_ports
 
     @property
     def infrastructure_packages(self) -> List:
@@ -111,7 +119,7 @@ class PythonEDA():
         :return: Such modules.
         :rtype: List
         """
-        return self._infrastructure_modules;
+        return self._infrastructure_modules
 
     @property
     def primary_ports(self) -> List:
@@ -132,7 +140,7 @@ class PythonEDA():
         return self._one_shot
 
     @one_shot.setter
-    def one_shot(self, value:bool):
+    def one_shot(self, value: bool):
         """
         Specifies whether one-shot behavior is active.
         :param value: Whether to activate such behavior.
@@ -149,7 +157,7 @@ class PythonEDA():
         sys.path.remove(root)
         sys.path.insert(0, root)
 
-    def fix_syspath(self, file:str):
+    def fix_syspath(self, file: str):
         """
         Fixes the sys.path collection to avoid duplicated entries for the specific project
         this (sub)class is defined.
@@ -159,7 +167,10 @@ class PythonEDA():
         base_folder = str(Path().resolve())
         current_folder = Path(file).resolve().parent
         app_module = os.path.basename(current_folder)
-        if os.path.isdir(Path(base_folder) / app_module) and str(current_folder) in sys.path:
+        if (
+            os.path.isdir(Path(base_folder) / app_module)
+            and str(current_folder) in sys.path
+        ):
             sys.path.remove(str(current_folder))
         path_to_remove = None
         for path in sys.path:
@@ -179,23 +190,22 @@ class PythonEDA():
         :return: True in such case.
         :rtype: bool
         """
-        if pkg.__name__ == 'pythoneda':
+        if pkg.__name__ == "pythoneda":
             result = True
-        elif pkg.__name__ == '' or pkg.__name__ == pkg.__package__:
+        elif pkg.__name__ == "" or pkg.__name__ == pkg.__package__:
             result = False
         else:
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=DeprecationWarning)
                 try:
-                    result = self.from_pythoneda(importlib.import_module(pkg.__package__))
+                    result = self.from_pythoneda(
+                        importlib.import_module(pkg.__package__)
+                    )
                 except ModuleNotFoundError as err:
                     import traceback
+
                     traceback.print_exc()
-                    if hasattr(err, "name"):
-                        message = f'Cannot import {pkg.__package__}: Missing dependency {err.name} ({err})\n'
-                    else:
-                        message = f'Cannot import {pkg.__package__}: {err}\n'
-                    sys.stderr.write(message)
+                    self.__class__.log_error(f"Cannot import {pkg.__package__}: {err}")
         return result
 
     def load_all_packages(self):
@@ -205,19 +215,19 @@ class PythonEDA():
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
             for importer, pkg, ispkg in pkgutil.iter_modules():
-                if pkg != 'pythoneda' and pkg != 'tkinter' and pkg != 'matplotlib_inline':
+                if (
+                    pkg != "pythoneda"
+                    and pkg != "tkinter"
+                    and pkg != "matplotlib_inline"
+                ):
                     if ispkg:
                         loader = importer.find_module(pkg)
                         try:
                             loader.load_module(pkg)
                         except Exception as err:
-                            if hasattr(err, "name"):
-                                message = f'Cannot import {pkg.__package__}: Missing dependency {err.name} ({err})\n'
-                            else:
-                                message = f'Cannot import {pkg}: {err}\n'
-                            sys.stderr.write(message)
+                            self.__class__.log_error(f"Cannot import {pkg}: {err}")
 
-        self.load_module_recursive('pythoneda')
+        self.load_module_recursive("pythoneda")
 
     def load_module_recursive(self, name):
         """
@@ -225,7 +235,7 @@ class PythonEDA():
         """
         try:
             # Try to load the module/package
-            module = __import__(name, fromlist=[''])
+            module = __import__(name, fromlist=[""])
 
             # If it's a package, discover its submodules and load them
             if pkgutil.get_loader(name).is_package(name):
@@ -234,13 +244,13 @@ class PythonEDA():
                     self.load_module_recursive(f"{name}.{mod_name}")
 
         except ImportError as err:
-            sys.stderr.write(f'Cannot import {name}: Missing dependency {err.name} {err}\n')
+            self.__class__.log_error(f"Cannot import {name}: {err}")
 
     def custom_sort(self, item):
         split_item = item.split(".")
         return len(split_item), split_item
 
-    def is_empty_namespace_folder(self, directory:str) -> bool:
+    def is_empty_namespace_folder(self, directory: str) -> bool:
         """
         Checks given folder is an empty namespace.
         :param directory: The folder to analyze.
@@ -257,11 +267,11 @@ class PythonEDA():
             path = os.path.join(directory, name)
 
             # Check if the file is __init__.py
-            if os.path.isfile(path) and name == '__init__.py':
+            if os.path.isfile(path) and name == "__init__.py":
                 has_init = True
 
             # Check if the file is not __init__.py
-            if os.path.isfile(path) and name != '__init__.py' and name.endswith(".py"):
+            if os.path.isfile(path) and name != "__init__.py" and name.endswith(".py"):
                 has_other_py_files = True
 
             # Check if there are subdirectories
@@ -282,12 +292,16 @@ class PythonEDA():
             init_file = Path(path) / "pythoneda" / Path("__init__.py")
             event_file = Path(path) / "pythoneda" / Path("event.py")
             port_file = Path(path) / "pythoneda" / Path("port.py")
-            if os.path.exists(init_file) and os.path.exists(event_file) and os.path.exists(port_file):
+            if (
+                os.path.exists(init_file)
+                and os.path.exists(event_file)
+                and os.path.exists(port_file)
+            ):
                 result = str(Path(path) / "pythoneda")
                 break
         return result
 
-    def get_path_of_packages_under_namespace(self, namespace:str) -> Dict:
+    def get_path_of_packages_under_namespace(self, namespace: str) -> Dict:
         """
         Retrieves the paths of packages under given namespace.
         :param namespace: The namespace.
@@ -300,27 +314,27 @@ class PythonEDA():
         for path in sys.path:
             init_file = Path(path) / "pythoneda" / Path("__init__.py")
             if os.path.exists(init_file):
-
-            # walk through all files and directories in site-packages
+                # walk through all files and directories in site-packages
                 for root, dirs, _ in os.walk(path):
-
                     # only consider directories
                     for dir in dirs:
-
                         # construct the full path
                         full_path = os.path.join(root, dir)
 
                         # if this directory is a package
-                        if os.path.isfile(os.path.join(full_path, '__init__.py')):
-
+                        if os.path.isfile(os.path.join(full_path, "__init__.py")):
                             # get the package name
-                            package_name = full_path[len(path)+1:].replace(os.sep, '.')
+                            package_name = full_path[len(path) + 1 :].replace(
+                                os.sep, "."
+                            )
 
                             # if the package is a sub-package of the namespace
-                            if package_name.startswith(namespace) and not result.get(package_name, False):
+                            if package_name.startswith(namespace) and not result.get(
+                                package_name, False
+                            ):
                                 result[package_name] = full_path
 
-        result['pythoneda'] = self.find_actual_root_pythoneda_package_path()
+        result["pythoneda"] = self.find_actual_root_pythoneda_package_path()
 
         return result
 
@@ -340,27 +354,47 @@ class PythonEDA():
             packages = self.get_path_of_packages_under_namespace("pythoneda")
             for package_name in packages:
                 try:
-                    package = __import__(package_name, fromlist=[''])
+                    package = __import__(package_name, fromlist=[""])
                     package = importlib.reload(package)
                     package_path = packages[package_name]
-                    domain_package = Bootstrap.instance().is_domain_package(package_path)
-                    infrastructure_package = Bootstrap.instance().is_infrastructure_package(package_path)
+                    domain_package = Bootstrap.instance().is_domain_package(
+                        package_path
+                    )
+                    infrastructure_package = (
+                        Bootstrap.instance().is_infrastructure_package(package_path)
+                    )
                     if domain_package:
                         if package_path not in domain_packages:
                             domain_packages.append(package_path)
-                        submodules = Bootstrap.instance().import_submodules(package, True, HexagonalLayer.DOMAIN)
-                        self.__class__.extend_missing_items(domain_modules, submodules.values())
+                        submodules = Bootstrap.instance().import_submodules(
+                            package, True, HexagonalLayer.DOMAIN
+                        )
+                        self.__class__.extend_missing_items(
+                            domain_modules, submodules.values()
+                        )
                     if infrastructure_package:
                         if package_path not in infrastructure_packages:
                             infrastructure_packages.append(package_path)
-                        submodules = Bootstrap.instance().import_submodules(package, True, HexagonalLayer.INFRASTRUCTURE)
-                        self.__class__.extend_missing_items(infrastructure_modules, submodules.values())
+                        submodules = Bootstrap.instance().import_submodules(
+                            package, True, HexagonalLayer.INFRASTRUCTURE
+                        )
+                        self.__class__.extend_missing_items(
+                            infrastructure_modules, submodules.values()
+                        )
                 except Exception as err:
                     import traceback
-                    traceback.print_exc()
-                    sys.stderr.write(f'Cannot import {package_path}: Missing dependency {err} when trying to import {package_name}\n')
 
-        return (domain_packages, domain_modules, infrastructure_packages, infrastructure_modules)
+                    traceback.print_exc()
+                    self.__class__.log_error(
+                        f"Cannot import {package_name} from {package_path}: {err}"
+                    )
+
+        return (
+            domain_packages,
+            domain_modules,
+            infrastructure_packages,
+            infrastructure_modules,
+        )
 
     def find_domain_ports(self, modules: List) -> List:
         """
@@ -373,9 +407,12 @@ class PythonEDA():
         result = []
         from pythoneda.port import Port
         from pythoneda.primary_port import PrimaryPort
+
         for module in modules:
             if Bootstrap.instance().is_domain_module(module):
-                interfaces = Bootstrap.instance().get_interfaces_of_module(Port, module, PrimaryPort)
+                interfaces = Bootstrap.instance().get_interfaces_of_module(
+                    Port, module, PrimaryPort
+                )
                 self.__class__.extend_missing_items(result, interfaces)
         return result
 
@@ -393,29 +430,63 @@ class PythonEDA():
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setLevel(initial_level)
             formatter = logging.Formatter(
-                '%(asctime)s [%(name)s] - %(levelname)s - %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S'
+                "%(asctime)s [%(name)s] - %(levelname)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
             )
             console_handler.setFormatter(formatter)
             default_logger.setLevel(initial_level)
             default_logger.addHandler(console_handler)
-            for name in [ "asyncio", "git" ]:
+            for name in ["asyncio", "git"]:
                 specific_logger = logging.getLogger(name)
                 specific_logger.setLevel(logging.WARNING)
             PythonEDA._default_logging_configured = True
 
     @classmethod
-    async def main(cls, name:str):
+    def log_debug(cls, message: str):
+        """
+        Prints a debug message.
+        :param message: The message to log.
+        :type message: str
+        """
+        if PythonEDA._default_logging_configured:
+            logging.getLogger("pythoneda.application.PythonEDA").debug(message)
+
+    @classmethod
+    def log_info(cls, message: str):
+        """
+        Prints an info message.
+        :param message: The message to log.
+        :type message: str
+        """
+        if PythonEDA._default_logging_configured:
+            logging.getLogger("pythoneda.application.PythonEDA").info(message)
+        else:
+            sys.stdout.write(f"{message}\n")
+
+    @classmethod
+    def log_error(cls, message: str):
+        """
+        Prints an info message.
+        :param message: The message to log.
+        :type message: str
+        """
+        if PythonEDA._default_logging_configured:
+            logging.getLogger("pythoneda.application.PythonEDA").error(message)
+        else:
+            sys.stderr.write(f"{message}\n")
+
+    @classmethod
+    async def main(cls, name: str):
         """
         Runs the application from the command line.
         :param name: The application name.
         :type name: str
         """
-        sys.stdout.write(f'Starting {name} ...\n')
+        sys.stdout.write(f"Starting {name} ...\n")
         instance = cls.instance()
         await instance.after_bootstrap()
         await instance.accept_input()
-        sys.stdout.write(f'Exiting {name} ...\n')
+        sys.stdout.write(f"Exiting {name} ...\n")
 
     @classmethod
     def instance(cls):
@@ -434,47 +505,102 @@ class PythonEDA():
         """
         mappings = {}
         if len(self.infrastructure_modules) == 0:
-            sys.stderr.write('No infrastructure modules detected!\n')
+            sys.stderr.write("No infrastructure modules detected!\n")
         else:
             for port in self.domain_ports:
-                implementations = Bootstrap.instance().get_adapters(port, self.infrastructure_modules)
+                implementations = Bootstrap.instance().get_adapters(
+                    port, self.infrastructure_modules
+                )
                 if len(implementations) == 0:
-                    if str(port.__module__) != 'pythoneda.repo':
-                        sys.stderr.write(f'No implementations found for {port} in {self.infrastructure_modules}\n')
+                    if str(port.__module__) != "pythoneda.repo":
+                        sys.stderr.write(
+                            f"No implementations found for {port} in {self.infrastructure_modules}\n"
+                        )
                 elif len(implementations) > 1:
-                    sys.stderr.write(f'Several implementations found for {port}: {implementations}. Using {implementations[0]}\n')
-                    mappings.update({ port: implementations[0]() })
+                    sys.stderr.write(
+                        f"Several implementations found for {port}: {implementations}. Using {implementations[0]}\n"
+                    )
+                    mappings.update({port: implementations[0]()})
                 else:
-                    mappings.update({ port: implementations[0]() })
+                    mappings.update({port: implementations[0]()})
             from pythoneda.ports import Ports
+
             Ports.initialize(mappings)
             from pythoneda.primary_port import PrimaryPort
-            self._primary_ports = Bootstrap.instance().get_adapters(PrimaryPort, self.infrastructure_modules)
+
+            self._primary_ports = Bootstrap.instance().get_adapters(
+                PrimaryPort, self.infrastructure_modules
+            )
             from pythoneda.event_listener import EventListener
             from pythoneda.event_emitter import EventEmitter
+
             EventEmitter.register_receiver(self)
+
+    @classmethod
+    def get_primary_port_instance(cls, primaryPort):
+        """
+        Retrieves the primary port instance, if possible.
+        :param primaryPort: The primary port.
+        :type primaryPort: type[pythoneda.PrimaryPort]
+        :return: Such instance.
+        :rtype: pythoneda.PrimaryPort
+        """
+        from pythoneda import Ports
+
+        result = Ports.instance().resolve(primaryPort)
+        if result is None and cls.has_default_constructor(primaryPort):
+            result = primaryPort()
+        return result
 
     @classmethod
     def delegate_priority(cls, primaryPort) -> int:
         """
         Delegates the priority information to given primary port.
         :param primaryPort: The primary port.
-        :type primaryPort: pythoneda.Port
+        :type primaryPort: type[pythoneda.PrimaryPort]
         :return: Such priority.
         :rtype: int
         """
-        return primaryPort().priority()
+        result = -1
+        instance = cls.get_primary_port_instance(primaryPort)
+        if instance:
+            result = instance.priority()
+        else:
+            result = primaryPort.default_priority()
+
+        return result
+
+    @classmethod
+    def has_default_constructor(cls, targetClass) -> bool:
+        """
+        Checks if given class defines the default constructor or not.
+        :param targetClass: The class to analyze.
+        :type targetClass: type
+        """
+        init_signature = inspect.signature(targetClass.__init__)
+
+        # Check if all parameters except 'self' have defaults
+        parameters = init_signature.parameters.values()
+        result = all(
+            p.default is not inspect.Parameter.empty or p.name == "self"
+            for p in parameters
+        )
+
+        return result
 
     async def accept_input(self):
         """
         Notification the application has been launched from the CLI.
         """
-        for primary_port in sorted(self.primary_ports, key=self.__class__.delegate_priority):
+        for primary_port in sorted(
+            self.primary_ports, key=self.__class__.delegate_priority
+        ):
             if not self.one_shot or primary_port.is_one_shot_compatible:
                 previous_one_shot = self.one_shot
-                port = primary_port()
-                await port.accept(self)
-                one_shot_changed = previous_one_shot != self.one_shot
+                port = self.__class__.get_primary_port_instance(primary_port)
+                if port is not None:
+                    await port.accept(self)
+                    one_shot_changed = previous_one_shot != self.one_shot
 
     async def after_bootstrap(self):
         """
@@ -482,7 +608,7 @@ class PythonEDA():
         """
         pass
 
-    async def accept(self, event): # : Event) -> Event:
+    async def accept(self, event):  # : Event) -> Event:
         """
         Accepts and processes an event, potentially generating others in response.
         :param event: The event to process.
@@ -494,11 +620,20 @@ class PythonEDA():
         if event:
             first_events = []
             from pythoneda import EventListener, PrimaryPort
+
             for listener_class in EventListener.listeners_for(event.__class__):
-                if not self.one_shot or (not issubclass(listener_class, PrimaryPort) or listener_class.is_one_shot_compatible):
+                if not self.one_shot or (
+                    not issubclass(listener_class, PrimaryPort)
+                    or listener_class.is_one_shot_compatible
+                ):
+                    self.__class__.log_debug(
+                        f"Delegating {event.__class__.full_class_name()} to {listener_class.full_class_name()}"
+                    )
                     resulting_events = await listener_class.accept(event)
                     if resulting_events and len(resulting_events) > 0:
-                        self.__class__.extend_missing_items(first_events, resulting_events)
+                        self.__class__.extend_missing_items(
+                            first_events, resulting_events
+                        )
             if len(first_events) > 0:
                 self.__class__.extend_missing_items(result, first_events)
         for evt in result:
@@ -514,8 +649,8 @@ class PythonEDA():
         """
         if event:
             from pythoneda import EventEmitter, Ports
+
             event_emitter = Ports.instance().resolve(EventEmitter)
-            print(f'emitting {event}')
             await event_emitter.emit(event)
 
     async def accept_configure_logging(self, logConfig: Dict[str, bool]):
@@ -528,7 +663,7 @@ class PythonEDA():
         if module_function:
             module_function(logConfig["info"], logConfig["verbose"], logConfig["quiet"])
 
-    async def accept_one_shot(self, flag:bool):
+    async def accept_one_shot(self, flag: bool):
         """
         Marks one-shot behavior as active or inactive.
         :param flag: Such behavior.
@@ -546,7 +681,6 @@ class PythonEDA():
         result = None
 
         for module in cls.instance().infrastructure_modules:
-
             if module.__name__ == "pythoneda.infrastructure.logging.logging_config":
                 entry = {}
                 configure_logging_function = getattr(module, "configure_logging", None)
@@ -557,7 +691,7 @@ class PythonEDA():
         return result
 
     @classmethod
-    def extend_missing_items(cls, first:List, second:List):
+    def extend_missing_items(cls, first: List, second: List):
         """
         Adds the items of the second list into the first list, excluding those already included.
         :param first: The first list.
@@ -577,6 +711,7 @@ class PythonEDA():
         super().__init_subclass__(**kwargs)
         PythonEDA.config_default_logging()
 
+
 from pythoneda.application import bootstrap
 import asyncio
 import importlib
@@ -585,5 +720,4 @@ import os
 import sys
 
 if __name__ == "__main__":
-
-    asyncio.run(PythonEDA.main('pythoneda.application.PythonEDA'))
+    asyncio.run(PythonEDA.main("pythoneda.application.PythonEDA"))

@@ -24,12 +24,13 @@ import inspect
 import os
 from pathlib import Path
 import pkgutil
-from pythoneda.application import HexagonalLayer
+from pythoneda.shared.artifact import HexagonalLayer
 import sys
 from typing import Callable, Dict, List
 import warnings
 
-class Bootstrap():
+
+class Bootstrap:
     """
     Provides logic required to bootstrapping PythonEDA applications.
 
@@ -41,6 +42,7 @@ class Bootstrap():
     Collaborators:
         - None
     """
+
     _singleton = None
     _domain_packages = {}
     _infrastructure_packages = {}
@@ -58,7 +60,7 @@ class Bootstrap():
             cls._singleton = cls()
         return cls._singleton
 
-    def _memoized(self, packagePath:str, type, cache:Dict, func:Callable) -> bool:
+    def _memoized(self, packagePath: str, type, cache: Dict, func: Callable) -> bool:
         """
         Retrieves whether given package matches a condition provided by `func`, using a cache to avoid redundant processing.
         :param packagePath: The path of the package to check.
@@ -86,9 +88,14 @@ class Bootstrap():
         :return: True if so.
         :rtype: bool
         """
-        return self._memoized(packagePath, HexagonalLayer.DOMAIN, self.__class__._domain_packages, self.is_of_type)
+        return self._memoized(
+            packagePath,
+            HexagonalLayer.DOMAIN,
+            self.__class__._domain_packages,
+            self.is_of_type,
+        )
 
-    def is_infrastructure_package(self, packagePath:str) -> bool:
+    def is_infrastructure_package(self, packagePath: str) -> bool:
         """
         Checks if given package is marked as infrastructure package.
         :param packagePath: The package path.
@@ -96,7 +103,12 @@ class Bootstrap():
         :return: True if so.
         :rtype: bool
         """
-        return self._memoized(packagePath, HexagonalLayer.INFRASTRUCTURE, self.__class__._infrastructure_packages, self.is_of_type)
+        return self._memoized(
+            packagePath,
+            HexagonalLayer.INFRASTRUCTURE,
+            self.__class__._infrastructure_packages,
+            self.is_of_type,
+        )
 
     def get_folders_of_parent_packages(self, path) -> List:
         """
@@ -111,11 +123,13 @@ class Bootstrap():
             folder = os.path.dirname(folder)
 
         current_path = folder
-        while (Path(current_path) / "__init__.py").exists() and current_path != os.path.dirname(current_path):
+        while (
+            Path(current_path) / "__init__.py"
+        ).exists() and current_path != os.path.dirname(current_path):
             yield current_path
             current_path = os.path.dirname(current_path)
 
-    def is_of_type(self, path:str, type: HexagonalLayer) -> bool:
+    def is_of_type(self, path: str, type: HexagonalLayer) -> bool:
         """
         Checks if given path is marked as of given type.
         :param path: The package path.
@@ -140,7 +154,12 @@ class Bootstrap():
         :return: True if so.
         :rtype: bool
         """
-        return self._memoized(module.__file__, HexagonalLayer.DOMAIN, self.__class__._domain_modules, self.is_of_type)
+        return self._memoized(
+            module.__file__,
+            HexagonalLayer.DOMAIN,
+            self.__class__._domain_modules,
+            self.is_of_type,
+        )
 
     def is_infrastructure_module(self, module) -> bool:
         """
@@ -150,7 +169,12 @@ class Bootstrap():
         :return: True if so.
         :rtype: bool
         """
-        return self._memoized(module.__file__, HexagonalLayer.INFRASTRUCTURE, self.__class__._infrastructure_modules, self.is_of_type)
+        return self._memoized(
+            module.__file__,
+            HexagonalLayer.INFRASTRUCTURE,
+            self.__class__._infrastructure_modules,
+            self.is_of_type,
+        )
 
     def get_interfaces_of_module(self, iface, module, excluding=None):
         """
@@ -166,17 +190,16 @@ class Bootstrap():
         """
         result = []
         with warnings.catch_warnings():
-            warnings.simplefilter('ignore', category=DeprecationWarning)
+            warnings.simplefilter("ignore", category=DeprecationWarning)
             try:
                 for class_name, self in inspect.getmembers(module, inspect.isclass):
-                    if (issubclass(self, iface) and
-                        self != iface):
+                    if issubclass(self, iface) and self != iface:
                         if excluding and issubclass(self, excluding):
                             pass
                         else:
                             result.append(self)
             except ImportError:
-                stderr.write(f'Cannot get members of {module}\n')
+                stderr.write(f"Cannot get members of {module}\n")
                 pass
         return result
 
@@ -193,19 +216,26 @@ class Bootstrap():
         implementations = []
 
         import abc
+
         for module in modules:
             try:
                 with warnings.catch_warnings():
-                    warnings.simplefilter('ignore', category=DeprecationWarning)
+                    warnings.simplefilter("ignore", category=DeprecationWarning)
                     for class_name, self in inspect.getmembers(module, inspect.isclass):
-                        if (inspect.isclass(self)) and (issubclass(self, interface)) and (self != interface) and (abc.ABC not in self.__bases__) and not self in implementations:
+                        if (
+                            (inspect.isclass(self))
+                            and (issubclass(self, interface))
+                            and (self != interface)
+                            and (abc.ABC not in self.__bases__)
+                            and not self in implementations
+                        ):
                             implementations.append(self)
             except ImportError as err:
-                Bootstrap.logger().error(f'Error importing {module}: {err}')
+                Bootstrap.logger().error(f"Error importing {module}: {err}")
 
         return implementations
 
-    def import_submodules(self, package, recursive=True, type:HexagonalLayer=None):
+    def import_submodules(self, package, recursive=True, type: HexagonalLayer = None):
         """
         Imports all submodules of a module, recursively, including subpackages.
         :param package: package (name or actual module)
@@ -220,13 +250,21 @@ class Bootstrap():
 
         if type is None or self.is_of_type(package.__path__[0], type):
             for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
-                full_name = package.__name__ + '.' + name
+                full_name = package.__name__ + "." + name
                 try:
-                    results[full_name] = __import__(full_name, fromlist=[''])
+                    results[full_name] = __import__(full_name, fromlist=[""])
                     if recursive and is_pkg:
-                        child_package = __import__(full_name, fromlist=[''])
-                        results.update(self.import_submodules(child_package, recursive)) # type is not considered for descendants.
+                        child_package = __import__(full_name, fromlist=[""])
+                        results.update(
+                            self.import_submodules(child_package, recursive)
+                        )  # type is not considered for descendants.
                 except ImportError as err:
-                    if not ".grpc." in full_name and not ".logging." in full_name and not ".git.":
-                        Bootstrap.logger().error(f'Error importing {full_name}: {err} while loading {package.__path__}')
+                    if (
+                        not ".grpc." in full_name
+                        and not ".logging." in full_name
+                        and not ".git."
+                    ):
+                        Bootstrap.logger().error(
+                            f"Error importing {full_name}: {err} while loading {package.__path__}"
+                        )
         return results
