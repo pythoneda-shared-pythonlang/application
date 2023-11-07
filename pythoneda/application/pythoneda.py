@@ -636,8 +636,9 @@ class PythonEDA:
                         )
             if len(first_events) > 0:
                 self.__class__.extend_missing_items(result, first_events)
-        for evt in result:
-            await self.emit(evt)
+        if not self.one_shot:
+            for evt in result:
+                await self.emit(evt)
 
         return result
 
