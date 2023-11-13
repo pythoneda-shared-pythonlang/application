@@ -353,21 +353,24 @@ class PythonEDA:
         extra_namespaces = os.environ.get("PYTHONEDA_EXTRA_NAMESPACES")
         if extra_namespaces is not None:
             for namespace in extra_namespaces.split(":"):
-                for
                 (
                     extra_domain_packages,
                     extra_domain_modules,
                     extra_infrastructure_packages,
                     extra_infrastructure_modules,
                 ) = self.load_packages_under(namespace)
-                self.__class__.extend_missing_items(domain_packages, extra_domain_packages)
-                self.__class__.extend_missing_items(domain_modules, extra_domain_modules)
+                self.__class__.extend_missing_items(
+                    domain_packages, extra_domain_packages
+                )
+                self.__class__.extend_missing_items(
+                    domain_modules, extra_domain_modules
+                )
                 self.__class__.extend_missing_items(
                     infrastructure_packages, extra_infrastructure_packages
                 )
                 self.__class__.extend_missing_items(
                     infrastructure_modules, extra_infrastructure_modules
-        )
+                )
         return (
             domain_packages,
             domain_modules,
