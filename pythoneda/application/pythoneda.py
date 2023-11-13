@@ -312,7 +312,7 @@ class PythonEDA:
         result = {}
 
         for path in sys.path:
-            init_file = Path(path) / "pythoneda" / Path("__init__.py")
+            init_file = Path(path) / namespace / Path("__init__.py")
             if os.path.exists(init_file):
                 # walk through all files and directories in site-packages
                 for root, dirs, _ in os.walk(path):
@@ -344,6 +344,45 @@ class PythonEDA:
         :return: A tuple consisting of (domain packages, domain modules, infrastructure packages, infrastructure modules).
         :rtype: tuple
         """
+        (
+            domain_packages,
+            domain_modules,
+            infrastructure_packages,
+            infrastructure_modules,
+        ) = self.load_packages_under("pythoneda")
+        extra_namespaces = os.environ.get("PYTHONEDA_EXTRA_NAMESPACES")
+        if extra_namespaces is not None:
+            for namespace in extra_namespaces.split(":"):
+                for
+                (
+                    extra_domain_packages,
+                    extra_domain_modules,
+                    extra_infrastructure_packages,
+                    extra_infrastructure_modules,
+                ) = self.load_packages_under(namespace)
+                self.__class__.extend_missing_items(domain_packages, extra_domain_packages)
+                self.__class__.extend_missing_items(domain_modules, extra_domain_modules)
+                self.__class__.extend_missing_items(
+                    infrastructure_packages, extra_infrastructure_packages
+                )
+                self.__class__.extend_missing_items(
+                    infrastructure_modules, extra_infrastructure_modules
+        )
+        return (
+            domain_packages,
+            domain_modules,
+            infrastructure_packages,
+            infrastructure_modules,
+        )
+
+    def load_packages_under(self, namespace: str) -> tuple:
+        """
+        Loads packages under given namespace.
+        :param namespace: The namespace.
+        :type namespace: str
+        :return: A tuple consisting of (domain packages, domain modules, infrastructure packages, infrastructure modules).
+        :rtype: tuple
+        """
 
         domain_packages = []
         domain_modules = []
@@ -351,7 +390,7 @@ class PythonEDA:
         infrastructure_modules = []
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
-            packages = self.get_path_of_packages_under_namespace("pythoneda")
+            packages = self.get_path_of_packages_under_namespace(namespace)
             for package_name in packages:
                 try:
                     package = __import__(package_name, fromlist=[""])
@@ -505,19 +544,22 @@ class PythonEDA:
         """
         mappings = {}
         if len(self.infrastructure_modules) == 0:
-            sys.stderr.write("No infrastructure modules detected!\n")
+            self.__class__.log_error("No infrastructure modules detected!\n")
         else:
             for port in self.domain_ports:
                 implementations = Bootstrap.instance().get_adapters(
                     port, self.infrastructure_modules
                 )
                 if len(implementations) == 0:
-                    if str(port.__module__) != "pythoneda.repo":
-                        sys.stderr.write(
-                            f"No implementations found for {port} in {self.infrastructure_modules}\n"
+                    if str(port.__module__) not in [
+                        "pythoneda.repo",
+                        "pythoneda.event_emitter",
+                    ]:
+                        self.__class__.log_error(
+                            f"[Warning] No implementations found for {port} in {self.infrastructure_modules}\n"
                         )
                 elif len(implementations) > 1:
-                    sys.stderr.write(
+                    self.__class__.log_error(
                         f"Several implementations found for {port}: {implementations}. Using {implementations[0]}\n"
                     )
                     mappings.update({port: implementations[0]()})
@@ -652,7 +694,8 @@ class PythonEDA:
             from pythoneda import EventEmitter, Ports
 
             event_emitter = Ports.instance().resolve(EventEmitter)
-            await event_emitter.emit(event)
+            if event_emitter is not None:
+                await event_emitter.emit(event)
 
     async def accept_configure_logging(self, logConfig: Dict[str, bool]):
         """
