@@ -205,7 +205,7 @@ class PythonEDA:
                     import traceback
 
                     traceback.print_exc()
-                    self.__class__.log_error(f"Cannot import {pkg.__package__}: {err}")
+                    PythonEDA.log_error(f"Cannot import {pkg.__package__}: {err}")
         return result
 
     def load_all_packages(self):
@@ -225,7 +225,7 @@ class PythonEDA:
                         try:
                             loader.load_module(pkg)
                         except Exception as err:
-                            self.__class__.log_error(f"Cannot import {pkg}: {err}")
+                            PythonEDA.log_error(f"Cannot import {pkg}: {err}")
 
         self.load_module_recursive("pythoneda")
 
@@ -244,7 +244,7 @@ class PythonEDA:
                     self.load_module_recursive(f"{name}.{mod_name}")
 
         except ImportError as err:
-            self.__class__.log_error(f"Cannot import {name}: {err}")
+            PythonEDA.log_error(f"Cannot import {name}: {err}")
 
     def custom_sort(self, item):
         split_item = item.split(".")
@@ -427,7 +427,7 @@ class PythonEDA:
                     import traceback
 
                     traceback.print_exc()
-                    self.__class__.log_error(
+                    PythonEDA.log_error(
                         f"Cannot import {package_name} from {package_path}: {err}"
                     )
 
@@ -547,7 +547,7 @@ class PythonEDA:
         """
         mappings = {}
         if len(self.infrastructure_modules) == 0:
-            self.__class__.log_error("No infrastructure modules detected!\n")
+            PythonEDA.log_error("No infrastructure modules detected!\n")
         else:
             for port in self.domain_ports:
                 implementations = Bootstrap.instance().get_adapters(
@@ -558,16 +558,10 @@ class PythonEDA:
                         "pythoneda.repo",
                         "pythoneda.event_emitter",
                     ]:
-                        self.__class__.log_error(
+                        PythonEDA.log_error(
                             f"[Warning] No implementations found for {port} in {self.infrastructure_modules}\n"
                         )
-                elif len(implementations) > 1:
-                    self.__class__.log_error(
-                        f"Several implementations found for {port}: {implementations}. Using {implementations[0]}\n"
-                    )
-                    mappings.update({port: implementations[0]()})
-                else:
-                    mappings.update({port: implementations[0]()})
+                mappings[port] = implementations
             from pythoneda.ports import Ports
 
             Ports.initialize(mappings)
@@ -592,9 +586,12 @@ class PythonEDA:
         """
         from pythoneda import Ports
 
-        result = Ports.instance().resolve(primaryPort)
-        if result is None and cls.has_default_constructor(primaryPort):
+        result = None
+        if cls.has_default_constructor(primaryPort):
             result = primaryPort()
+        if result is None and cls.has_instance_method(primaryPort):
+            result = primaryPort.instance()
+
         return result
 
     @classmethod
@@ -607,11 +604,13 @@ class PythonEDA:
         :rtype: int
         """
         result = -1
-        instance = cls.get_primary_port_instance(primaryPort)
-        if instance:
-            result = instance.priority()
-        else:
-            result = primaryPort.default_priority()
+        if cls.has_default_priority_method(primaryPort):
+            result = result = primaryPort.default_priority()
+
+        if cls.has_priority_method(primaryPort):
+            instance = cls.get_primary_port_instance(primaryPort)
+            if instance:
+                result = instance.priority()
 
         return result
 
@@ -632,6 +631,54 @@ class PythonEDA:
         )
 
         return result
+
+    @classmethod
+    def has_instance_method(cls, targetClass) -> bool:
+        """
+        Checks if given class defines an instance() method or not.
+        :param targetClass: The class to analyze.
+        :type targetClass: type
+        :return: True if the class defines that method.
+        :rtype: bool
+        """
+        return cls.has_method(targetClass, "instance")
+
+    @classmethod
+    def has_priority_method(cls, targetClass) -> bool:
+        """
+        Checks if given class defines a priority() method or not.
+        :param targetClass: The class to analyze.
+        :type targetClass: type
+        :return: True if the class defines that method.
+        :rtype: bool
+        """
+        return cls.has_method(targetClass, "priority")
+
+    @classmethod
+    def has_default_priority_method(cls, targetClass) -> bool:
+        """
+        Checks if given class defines a default_priority() method or not.
+        :param targetClass: The class to analyze.
+        :type targetClass: type
+        :return: True if the class defines that method.
+        :rtype: bool
+        """
+        return cls.has_method(targetClass, "default_priority")
+
+    @classmethod
+    def has_method(cls, targetClass, methodName: str) -> bool:
+        """
+        Checks if given class defines a given method or not.
+        :param targetClass: The class to analyze.
+        :type targetClass: type
+        :param methodName: The method name.
+        :type methodName: str
+        :return: True if the class defines that method.
+        :rtype: bool
+        """
+        return hasattr(targetClass, methodName) and callable(
+            getattr(targetClass, methodName)
+        )
 
     async def accept_input(self):
         """
@@ -671,7 +718,7 @@ class PythonEDA:
                     not issubclass(listener_class, PrimaryPort)
                     or listener_class.is_one_shot_compatible
                 ):
-                    self.__class__.log_debug(
+                    PythonEDA.log_debug(
                         f"Delegating {event.__class__.full_class_name()} to {listener_class.full_class_name()}"
                     )
                     resulting_events = await listener_class.accept(event)

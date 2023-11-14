@@ -140,10 +140,35 @@ class Bootstrap:
         :rtype: bool
         """
         result = False
-        for folder in self.get_folders_of_parent_packages(path):
-            if (Path(folder) / f".pythoneda-{type.name.lower()}").exists():
-                result = True
-                break
+        if (Path(os.path.dirname(path)) / f".pythoneda-{type.name.lower()}").exists():
+            result = True
+        else:
+            if type == HexagonalLayer.DOMAIN and (
+                (
+                    Path(os.path.dirname(path))
+                    / f".pythoneda-{HexagonalLayer.INFRASTRUCTURE.name.lower()}"
+                ).exists()
+                or (
+                    Path(os.path.dirname(path))
+                    / f".pythoneda-{HexagonalLayer.APPLICATION.name.lower()}"
+                ).exists()
+            ):
+                result = False
+            else:
+                for folder in self.get_folders_of_parent_packages(path):
+                    if (Path(folder) / f".pythoneda-{type.name.lower()}").exists():
+                        result = True
+                        break
+                    elif (
+                        type != HexagonalLayer.DOMAIN
+                        and (
+                            Path(os.path.dirname(path))
+                            / f".pythoneda-{HexagonalLayer.DOMAIN.name.lower()}"
+                        ).exists()
+                    ):
+                        result = False
+                        break
+
         return result
 
     def is_domain_module(self, module) -> bool:
