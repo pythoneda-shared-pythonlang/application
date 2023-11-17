@@ -202,9 +202,6 @@ class PythonEDA:
                         importlib.import_module(pkg.__package__)
                     )
                 except ModuleNotFoundError as err:
-                    import traceback
-
-                    traceback.print_exc()
                     PythonEDA.log_error(f"Cannot import {pkg.__package__}: {err}")
         return result
 
@@ -424,9 +421,6 @@ class PythonEDA:
                             infrastructure_modules, submodules.values()
                         )
                 except Exception as err:
-                    import traceback
-
-                    traceback.print_exc()
                     PythonEDA.log_error(
                         f"Cannot import {package_name} from {package_path}: {err}"
                     )
@@ -605,7 +599,7 @@ class PythonEDA:
         """
         result = -1
         if cls.has_default_priority_method(primaryPort):
-            result = result = primaryPort.default_priority()
+            result = primaryPort.default_priority()
 
         if cls.has_priority_method(primaryPort):
             instance = cls.get_primary_port_instance(primaryPort)
