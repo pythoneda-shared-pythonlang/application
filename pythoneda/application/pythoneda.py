@@ -357,11 +357,14 @@ class PythonEDA:
                     extra_infrastructure_packages,
                     extra_infrastructure_modules,
                 ) = self.load_packages_under(namespace)
+                print()
                 print(f"{namespace} domain packages: {extra_domain_packages}")
+                print()
                 print(f"{namespace} domain modules: {extra_domain_modules}")
                 print(
                     f"{namespace} infrastructure packages: {extra_infrastructure_packages}"
                 )
+                print()
                 print(
                     f"{namespace} infrastructure modules: {extra_infrastructure_modules}"
                 )
@@ -400,6 +403,9 @@ class PythonEDA:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
             packages = self.get_path_of_packages_under_namespace(namespace)
+            print()
+            print(f"packages under {namespace}: {packages}")
+            print()
             for package_name in packages:
                 try:
                     package = __import__(package_name, fromlist=[""])
