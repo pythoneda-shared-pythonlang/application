@@ -345,7 +345,7 @@ class PythonEDA:
                         # if this directory is a package
                         if os.path.isfile(os.path.join(full_path, "__init__.py")):
                             # get the package name
-                            package_name = full_path[len(path) + 1 :].replace(
+                            package_name = full_path[len(root_path) + 1 :].replace(
                                 os.sep, "."
                             )
 
