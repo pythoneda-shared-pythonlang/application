@@ -298,6 +298,26 @@ class PythonEDA:
                 break
         return result
 
+    def find_root_of(self, path: str) -> str:
+        """
+        Traverses the parents of given path until it reaches the "site-packages".
+        :param path: The path.
+        :type path: str
+        :return: The root path.
+        :rtype: str
+        """
+        working_path = path
+        while True:
+            if os.path.basename(working_path) == "site-packages":
+                return os.path.abspath(working_path)
+
+            parent = os.path.dirname(working_path)
+
+            if parent == working_path:
+                return path
+
+            working_path = parent
+
     def get_path_of_packages_under_namespace(self, namespace: str) -> Dict:
         """
         Retrieves the paths of packages under given namespace.
@@ -309,10 +329,11 @@ class PythonEDA:
         result = {}
 
         for path in sys.path:
+            root_path = self.find_root_of(path)
             print()
-            print(f"checking {path}")
+            print(f"checking {path} -> {root_path}")
             print()
-            init_file = Path(path) / namespace / Path("__init__.py")
+            init_file = Path(root_path) / namespace / Path("__init__.py")
             if os.path.exists(init_file):
                 # walk through all files and directories in site-packages
                 for root, dirs, _ in os.walk(path):
