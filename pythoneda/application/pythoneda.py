@@ -336,7 +336,7 @@ class PythonEDA:
                 print(f"namespace {namespace} found on {root_path}")
                 print()
                 # walk through all files and directories in site-packages
-                for root, dirs, _ in os.walk(path):
+                for root, dirs, _ in os.walk(root_path):
                     # only consider directories
                     for dir in dirs:
                         # construct the full path
