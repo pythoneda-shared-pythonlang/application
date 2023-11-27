@@ -330,11 +330,11 @@ class PythonEDA:
 
         for path in sys.path:
             root_path = self.find_root_of(path)
-            print()
-            print(f"checking {path} -> {root_path}")
-            print()
             init_file = Path(root_path) / namespace / Path("__init__.py")
             if os.path.exists(init_file):
+                print()
+                print(f'namespace {namespace) found on {root_path}')
+                print()
                 # walk through all files and directories in site-packages
                 for root, dirs, _ in os.walk(path):
                     # only consider directories
