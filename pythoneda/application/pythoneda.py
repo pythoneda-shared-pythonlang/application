@@ -309,6 +309,9 @@ class PythonEDA:
         result = {}
 
         for path in sys.path:
+            print()
+            print(f"checking {path}")
+            print()
             init_file = Path(path) / namespace / Path("__init__.py")
             if os.path.exists(init_file):
                 # walk through all files and directories in site-packages
