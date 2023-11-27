@@ -348,6 +348,7 @@ class PythonEDA:
             infrastructure_modules,
         ) = self.load_packages_under("pythoneda")
         extra_namespaces = os.environ.get("PYTHONEDA_EXTRA_NAMESPACES")
+        print(f"extra-namespaces: {extra_namespaces}")
         if extra_namespaces is not None:
             for namespace in extra_namespaces.split(":"):
                 (
@@ -518,11 +519,9 @@ class PythonEDA:
         :param name: The application name.
         :type name: str
         """
-        sys.stdout.write(f"Starting {name} ...\n")
         instance = cls.instance()
         await instance.after_bootstrap()
         await instance.accept_input()
-        sys.stdout.write(f"Exiting {name} ...\n")
 
     @classmethod
     def instance(cls):

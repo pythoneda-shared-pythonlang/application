@@ -238,7 +238,7 @@ class Bootstrap:
         :return: The list of implementations.
         :rtype: List
         """
-        implementations = []
+        result = []
 
         import abc
 
@@ -252,13 +252,13 @@ class Bootstrap:
                             and (issubclass(self, interface))
                             and (self != interface)
                             and (abc.ABC not in self.__bases__)
-                            and not self in implementations
+                            and not self in result
                         ):
-                            implementations.append(self)
+                            result.append(self)
             except ImportError as err:
                 Bootstrap.logger().error(f"Error importing {module}: {err}")
 
-        return implementations
+        return result
 
     def import_submodules(self, package, recursive=True, type: HexagonalLayer = None):
         """
