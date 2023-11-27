@@ -164,23 +164,20 @@ class PythonEDA:
         :param file: The file where this specific instance is defined.
         :type file: str
         """
-        base_folder = str(Path().resolve())
-        current_folder = Path(file).resolve().parent
-        app_module = os.path.basename(current_folder)
-        if (
-            os.path.isdir(Path(base_folder) / app_module)
-            and str(current_folder) in sys.path
-        ):
-            sys.path.remove(str(current_folder))
-        path_to_remove = None
+        paths_to_add = []
+        paths_to_remove = []
+
         for path in sys.path:
-            if os.path.isdir(Path(path) / app_module):
-                path_to_remove = path
-                break
-        if path_to_remove:
-            sys.path.remove(str(path_to_remove))
-        if base_folder not in sys.path:
-            sys.path.append(base_folder)
+            root_path = self.find_root_of(path)
+            if root_path != path:
+                paths_to_remove.append(path)
+                paths_to_add.append(root_path)
+
+        for path_to_remove in paths_to_remove:
+            sys.path.remove(os.path.abspath(path_to_remove))
+
+        for path_to_add in paths_to_add:
+            sys.path.append(os.path.abspath(path_to_add))
 
     def from_pythoneda(self, pkg) -> bool:
         """
@@ -329,14 +326,13 @@ class PythonEDA:
         result = {}
 
         for path in sys.path:
-            root_path = self.find_root_of(path)
-            init_file = Path(root_path) / namespace / Path("__init__.py")
+            init_file = Path(path) / namespace / Path("__init__.py")
             if os.path.exists(init_file):
                 print()
-                print(f"namespace {namespace} found on {root_path}")
+                print(f"namespace {namespace} found on {path}")
                 print()
                 # walk through all files and directories in site-packages
-                for root, dirs, _ in os.walk(root_path):
+                for root, dirs, _ in os.walk(path):
                     # only consider directories
                     for dir in dirs:
                         # construct the full path
@@ -345,7 +341,7 @@ class PythonEDA:
                         # if this directory is a package
                         if os.path.isfile(os.path.join(full_path, "__init__.py")):
                             # get the package name
-                            package_name = full_path[len(root_path) + 1 :].replace(
+                            package_name = full_path[len(path) + 1 :].replace(
                                 os.sep, "."
                             )
 
@@ -460,9 +456,7 @@ class PythonEDA:
                             infrastructure_modules, submodules.values()
                         )
                 except Exception as err:
-                    PythonEDA.log_error(
-                        f"Cannot import {package_name} from {package_path}: {err}"
-                    )
+                    PythonEDA.log_error(f"Cannot import {package_name}: {err}")
 
         return (
             domain_packages,
