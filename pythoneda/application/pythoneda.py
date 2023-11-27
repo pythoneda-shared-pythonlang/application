@@ -357,6 +357,14 @@ class PythonEDA:
                     extra_infrastructure_packages,
                     extra_infrastructure_modules,
                 ) = self.load_packages_under(namespace)
+                print(f"{namespace} domain packages: {extra_domain_packages}")
+                print(f"{namespace} domain modules: {extra_domain_modules}")
+                print(
+                    f"{namespace} infrastructure packages: {extra_infrastructure_packages}"
+                )
+                print(
+                    f"{namespace} infrastructure modules: {extra_infrastructure_modules}"
+                )
                 self.__class__.extend_missing_items(
                     domain_packages, extra_domain_packages
                 )
