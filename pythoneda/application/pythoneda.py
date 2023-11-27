@@ -179,11 +179,6 @@ class PythonEDA:
         for path_to_add in paths_to_add:
             sys.path.append(os.path.abspath(path_to_add))
 
-        print()
-        print(f"*** sys.path ***")
-        print(sys.path)
-        print()
-
     def from_pythoneda(self, pkg) -> bool:
         """
         Checks if given package is from PythonEDA.
@@ -333,9 +328,6 @@ class PythonEDA:
         for path in sys.path:
             init_file = Path(path) / namespace / Path("__init__.py")
             if os.path.exists(init_file):
-                print()
-                print(f"namespace {namespace} found on {path}")
-                print()
                 # walk through all files and directories in site-packages
                 for root, dirs, _ in os.walk(path):
                     # only consider directories
@@ -373,7 +365,6 @@ class PythonEDA:
             infrastructure_modules,
         ) = self.load_packages_under("pythoneda")
         extra_namespaces = os.environ.get("PYTHONEDA_EXTRA_NAMESPACES")
-        print(f"extra-namespaces: {extra_namespaces}")
         if extra_namespaces is not None:
             for namespace in extra_namespaces.split(":"):
                 (
@@ -382,17 +373,6 @@ class PythonEDA:
                     extra_infrastructure_packages,
                     extra_infrastructure_modules,
                 ) = self.load_packages_under(namespace)
-                print()
-                print(f"{namespace} domain packages: {extra_domain_packages}")
-                print()
-                print(f"{namespace} domain modules: {extra_domain_modules}")
-                print(
-                    f"{namespace} infrastructure packages: {extra_infrastructure_packages}"
-                )
-                print()
-                print(
-                    f"{namespace} infrastructure modules: {extra_infrastructure_modules}"
-                )
                 self.__class__.extend_missing_items(
                     domain_packages, extra_domain_packages
                 )
@@ -428,9 +408,6 @@ class PythonEDA:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
             packages = self.get_path_of_packages_under_namespace(namespace)
-            print()
-            print(f"packages under {namespace}: {packages}")
-            print()
             for package_name in packages:
                 try:
                     package = __import__(package_name, fromlist=[""])
