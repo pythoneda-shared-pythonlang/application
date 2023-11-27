@@ -179,6 +179,11 @@ class PythonEDA:
         for path_to_add in paths_to_add:
             sys.path.append(os.path.abspath(path_to_add))
 
+        print()
+        print(f"*** sys.path ***")
+        print(sys.path)
+        print()
+
     def from_pythoneda(self, pkg) -> bool:
         """
         Checks if given package is from PythonEDA.
