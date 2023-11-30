@@ -50,6 +50,7 @@ class PythonEDA:
 
     _default_logging_configured = False
     _singleton = None
+    _enabled_infrastructure_modules = []
 
     def __init__(self, banner=None, file=__file__):
         """
@@ -364,6 +365,10 @@ class PythonEDA:
             infrastructure_packages,
             infrastructure_modules,
         ) = self.load_packages_under("pythoneda")
+        self.__class__.extend_missing_items(
+            infrastructure_modules, PythonEDA._enabled_infrastructure_modules
+        )
+
         extra_namespaces = os.environ.get("PYTHONEDA_EXTRA_NAMESPACES")
         if extra_namespaces is not None:
             for namespace in extra_namespaces.split(":"):
@@ -535,6 +540,7 @@ class PythonEDA:
         """
         instance = cls.instance()
         await instance.after_bootstrap()
+
         await instance.accept_input()
 
     @classmethod
@@ -582,8 +588,7 @@ class PythonEDA:
 
             EventEmitter.register_receiver(self)
 
-    @classmethod
-    def get_primary_port_instance(cls, primaryPort):
+    def get_primary_port_instance(self, primaryPort):
         """
         Retrieves the primary port instance, if possible.
         :param primaryPort: The primary port.
@@ -594,15 +599,18 @@ class PythonEDA:
         from pythoneda import Ports
 
         result = None
-        if cls.has_default_constructor(primaryPort):
+        if self.__class__.has_default_constructor(primaryPort):
             result = primaryPort()
-        if result is None and cls.has_instance_method(primaryPort):
+        if result is None and self.__class__.has_instance_method(primaryPort):
             result = primaryPort.instance()
+        if result is None and self.__class__.has_constructor_with_app_argument(
+            primaryPort
+        ):
+            result = primaryPort(self)
 
         return result
 
-    @classmethod
-    def delegate_priority(cls, primaryPort) -> int:
+    def delegate_priority(self, primaryPort) -> int:
         """
         Delegates the priority information to given primary port.
         :param primaryPort: The primary port.
@@ -611,13 +619,11 @@ class PythonEDA:
         :rtype: int
         """
         result = -1
-        if cls.has_default_priority_method(primaryPort):
+        if self.__class__.has_default_priority_class_method(primaryPort):
             result = primaryPort.default_priority()
 
-        if cls.has_priority_method(primaryPort):
-            instance = cls.get_primary_port_instance(primaryPort)
-            if instance:
-                result = instance.priority()
+        if self.__class__.has_priority_class_method(primaryPort):
+            result = primaryPort.priority()
 
         return result
 
@@ -648,10 +654,30 @@ class PythonEDA:
         :return: True if the class defines that method.
         :rtype: bool
         """
-        return cls.has_method(targetClass, "instance")
+        return cls.has_class_method(targetClass, "instance")
 
     @classmethod
-    def has_priority_method(cls, targetClass) -> bool:
+    def has_constructor_with_app_argument(cls, targetClass) -> bool:
+        """
+        Checks if the constructor of given class defines an "app" as argument or not.
+        :param targetClass: The class to analyze.
+        :type targetClass: type
+        """
+        init_signature = inspect.signature(targetClass.__init__)
+
+        # Check if all parameters except 'self' or 'app' have defaults.
+        parameters = init_signature.parameters.values()
+        result = all(
+            p.default is not inspect.Parameter.empty
+            or p.name == "self"
+            or p.name == "app"
+            for p in parameters
+        )
+
+        return result
+
+    @classmethod
+    def has_priority_class_method(cls, targetClass) -> bool:
         """
         Checks if given class defines a priority() method or not.
         :param targetClass: The class to analyze.
@@ -659,10 +685,10 @@ class PythonEDA:
         :return: True if the class defines that method.
         :rtype: bool
         """
-        return cls.has_method(targetClass, "priority")
+        return cls.has_class_method(targetClass, "priority")
 
     @classmethod
-    def has_default_priority_method(cls, targetClass) -> bool:
+    def has_default_priority_class_method(cls, targetClass) -> bool:
         """
         Checks if given class defines a default_priority() method or not.
         :param targetClass: The class to analyze.
@@ -670,10 +696,10 @@ class PythonEDA:
         :return: True if the class defines that method.
         :rtype: bool
         """
-        return cls.has_method(targetClass, "default_priority")
+        return cls.has_class_method(targetClass, "default_priority")
 
     @classmethod
-    def has_method(cls, targetClass, methodName: str) -> bool:
+    def has_class_method(cls, targetClass, methodName: str) -> bool:
         """
         Checks if given class defines a given method or not.
         :param targetClass: The class to analyze.
@@ -691,14 +717,12 @@ class PythonEDA:
         """
         Notification the application has been launched from the CLI.
         """
-        for primary_port in sorted(
-            self.primary_ports, key=self.__class__.delegate_priority
-        ):
+        for primary_port in sorted(self.primary_ports, key=self.delegate_priority):
             if not self.one_shot or primary_port.is_one_shot_compatible:
                 previous_one_shot = self.one_shot
-                port = self.__class__.get_primary_port_instance(primary_port)
+                port = self.get_primary_port_instance(primary_port)
                 if port is not None:
-                    await port.accept(self)
+                    await port.entrypoint(self)
                     one_shot_changed = previous_one_shot != self.one_shot
 
     async def after_bootstrap(self):
@@ -762,7 +786,7 @@ class PythonEDA:
         """
         module_function = self.__class__.get_log_config()
         if module_function:
-            module_function(logConfig["info"], logConfig["verbose"], logConfig["quiet"])
+            module_function(logConfig["info"], logConfig["debug"], logConfig["quiet"])
 
     async def accept_one_shot(self, flag: bool):
         """

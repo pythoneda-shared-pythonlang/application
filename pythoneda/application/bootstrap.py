@@ -246,15 +246,15 @@ class Bootstrap:
             try:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", category=DeprecationWarning)
-                    for class_name, self in inspect.getmembers(module, inspect.isclass):
+                    for class_name, inst in inspect.getmembers(module, inspect.isclass):
                         if (
-                            (inspect.isclass(self))
-                            and (issubclass(self, interface))
-                            and (self != interface)
-                            and (abc.ABC not in self.__bases__)
-                            and not self in result
+                            (inspect.isclass(inst))
+                            and (issubclass(inst, interface))
+                            and (inst != interface)
+                            and (abc.ABC not in inst.__bases__)
+                            and not inst in result
                         ):
-                            result.append(self)
+                            result.append(inst)
             except ImportError as err:
                 Bootstrap.logger().error(f"Error importing {module}: {err}")
 

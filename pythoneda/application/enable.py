@@ -1,7 +1,7 @@
 """
-pythoneda/application/__init__.py
+pythoneda/application/enable.py
 
-This file ensures pythoneda.application is a package.
+This file defines the "enable" annotation, to enable specific infrastructure modules.
 
 Copyright (C) 2023-today rydnr's pythoneda-shared-pythoneda/application
 
@@ -18,8 +18,15 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-__path__ = __import__("pkgutil").extend_path(__path__, __name__)
-
-from .bootstrap import Bootstrap
+import importlib
 from .pythoneda import PythonEDA
-from .enable import enable
+
+
+def enable(adapterCls):
+    def decorator(cls):
+        module = importlib.import_module(adapterCls.__module__)
+        if module not in PythonEDA._enabled_infrastructure_modules:
+            PythonEDA._enabled_infrastructure_modules.append(module)
+        return cls
+
+    return decorator
