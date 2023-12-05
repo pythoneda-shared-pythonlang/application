@@ -62,8 +62,7 @@ class PythonEDA:
         """
         super().__init__()
         self._primary_ports = []
-        if banner:
-            banner.print()
+        self._banner = banner
         self.fix_syspath(file)
         self.sort_pythoneda_package_in_sys_path()
         self.load_all_packages()
@@ -130,6 +129,15 @@ class PythonEDA:
         :rtype: List
         """
         return self._primary_ports
+
+    @property
+    def banner(self):
+        """
+        Retrieves the banner, if any.
+        :return: The banner instance.
+        :rtype: pythoneda.banner.Banner
+        """
+        return self._banner
 
     @property
     def one_shot(self) -> bool:
@@ -753,15 +761,22 @@ class PythonEDA:
                         f"Delegating {event.__class__.full_class_name()} to {listener_class.full_class_name()}"
                     )
                     resulting_events = await listener_class.accept(event)
+                    for new_event in resulting_events:
+                        asyncio.create_task(self.emit(new_event))
                     if resulting_events and len(resulting_events) > 0:
                         self.__class__.extend_missing_items(
                             first_events, resulting_events
                         )
             if len(first_events) > 0:
                 self.__class__.extend_missing_items(result, first_events)
-        if not self.one_shot:
-            for evt in result:
-                await self.emit(evt)
+
+        await asyncio.gather()
+
+        aux = []
+        for evt in result:
+            self.__class__.extend_missing_items(aux, await self.accept(evt))
+
+        self.__class__.extend_missing_items(result, aux)
 
         return result
 
@@ -776,6 +791,7 @@ class PythonEDA:
 
             event_emitter = Ports.instance().resolve(EventEmitter)
             if event_emitter is not None:
+                PythonEDA.log_debug(f"Emitting {event.__class__}")
                 await event_emitter.emit(event)
 
     async def accept_configure_logging(self, logConfig: Dict[str, bool]):
@@ -787,6 +803,9 @@ class PythonEDA:
         module_function = self.__class__.get_log_config()
         if module_function:
             module_function(logConfig["info"], logConfig["debug"], logConfig["quiet"])
+
+        if not logConfig["quiet"] and self.banner is not None:
+            self.banner.print()
 
     async def accept_one_shot(self, flag: bool):
         """
