@@ -805,9 +805,7 @@ class PythonEDA:
             module_function(logConfig["info"], logConfig["debug"], logConfig["quiet"])
 
         quiet = logConfig["quiet"]
-        print(f"quiet? {quiet}")
         if not quiet and self.banner is not None:
-            print("printing banner")
             self.banner.print()
 
     async def accept_one_shot(self, flag: bool):
