@@ -804,8 +804,9 @@ class PythonEDA:
         if module_function:
             module_function(logConfig["info"], logConfig["debug"], logConfig["quiet"])
 
-        print(f"banner -> {self.banner}")
-        if not logConfig["quiet"] and self.banner is not None:
+        quiet = logConfig["quiet"]
+        print(f"quiet? {quiet}")
+        if not quiet and self.banner is not None:
             print("printing banner")
             self.banner.print()
 
