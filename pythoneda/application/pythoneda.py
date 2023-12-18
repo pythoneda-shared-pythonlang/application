@@ -76,6 +76,16 @@ class PythonEDA:
         self._one_shot = False
         self.initialize()
 
+    @classmethod
+    @property
+    def enabled_infrastructure_modules(cls) -> List:
+        """
+        Retrieves the enabled infrastructure modules.
+        :return: Such list.
+        :rtype: List
+        """
+        return cls._enabled_infrastructure_modules
+
     @property
     def domain_packages(self) -> List:
         """
@@ -374,7 +384,7 @@ class PythonEDA:
             infrastructure_modules,
         ) = self.load_packages_under("pythoneda")
         self.__class__.extend_missing_items(
-            infrastructure_modules, PythonEDA._enabled_infrastructure_modules
+            infrastructure_modules, PythonEDA.enabled_infrastructure_modules
         )
 
         extra_namespaces = os.environ.get("PYTHONEDA_EXTRA_NAMESPACES")
