@@ -721,11 +721,9 @@ class PythonEDA:
         Notification the application has been launched from the CLI.
         """
         for primary_port in sorted(self.primary_ports, key=self.delegate_priority):
-            print(f"primary port -> {primary_port}")
             if primary_port != LoggingConfigCli and (
                 not self.one_shot or primary_port.is_one_shot_compatible
             ):
-                print("ok")
                 previous_one_shot = self.one_shot
                 port = self.get_primary_port_instance(primary_port)
                 if port is not None:
