@@ -26,6 +26,7 @@ def enable(adapterCls):
     def decorator(cls):
         module = importlib.import_module(adapterCls.__module__)
         if module not in PythonEDA.enabled_infrastructure_modules:
+            adapterCls.enable()
             PythonEDA.enabled_infrastructure_modules.append(module)
         return cls
 

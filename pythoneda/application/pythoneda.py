@@ -19,13 +19,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from .bootstrap import Bootstrap
+import importlib
 import inspect
 import logging
 import os
 from pathlib import Path
 import pkgutil
-from pythoneda.shared.artifact import HexagonalLayer
 from pythoneda.banner import Banner
+from pythoneda.infrastructure.cli import LoggingConfigCli
+from pythoneda.infrastructure.logging import LoggingAdapter
+from pythoneda.shared.artifact import HexagonalLayer
 import sys
 from typing import Callable, Dict, List
 import warnings
@@ -70,7 +73,6 @@ class PythonEDA:
             self._domain_packages,
             self._domain_modules,
             self._infrastructure_packages,
-            self._infrastructure_modules,
         ) = self.load_pythoneda_packages()
         self._domain_ports = self.find_domain_ports(self._domain_modules)
         self._one_shot = False
@@ -121,15 +123,6 @@ class PythonEDA:
         :rtype: List
         """
         return self._infrastructure_packages
-
-    @property
-    def infrastructure_modules(self) -> List:
-        """
-        Retrieves the infrastructure modules.
-        :return: Such modules.
-        :rtype: List
-        """
-        return self._infrastructure_modules
 
     @property
     def primary_ports(self) -> List:
@@ -381,11 +374,7 @@ class PythonEDA:
             domain_packages,
             domain_modules,
             infrastructure_packages,
-            infrastructure_modules,
         ) = self.load_packages_under("pythoneda")
-        self.__class__.extend_missing_items(
-            infrastructure_modules, PythonEDA.enabled_infrastructure_modules
-        )
 
         extra_namespaces = os.environ.get("PYTHONEDA_EXTRA_NAMESPACES")
         if extra_namespaces is not None:
@@ -394,7 +383,6 @@ class PythonEDA:
                     extra_domain_packages,
                     extra_domain_modules,
                     extra_infrastructure_packages,
-                    extra_infrastructure_modules,
                 ) = self.load_packages_under(namespace)
                 self.__class__.extend_missing_items(
                     domain_packages, extra_domain_packages
@@ -405,15 +393,7 @@ class PythonEDA:
                 self.__class__.extend_missing_items(
                     infrastructure_packages, extra_infrastructure_packages
                 )
-                self.__class__.extend_missing_items(
-                    infrastructure_modules, extra_infrastructure_modules
-                )
-        return (
-            domain_packages,
-            domain_modules,
-            infrastructure_packages,
-            infrastructure_modules,
-        )
+        return (domain_packages, domain_modules, infrastructure_packages)
 
     def load_packages_under(self, namespace: str) -> tuple:
         """
@@ -427,7 +407,6 @@ class PythonEDA:
         domain_packages = []
         domain_modules = []
         infrastructure_packages = []
-        infrastructure_modules = []
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
             packages = self.get_path_of_packages_under_namespace(namespace)
@@ -454,21 +433,10 @@ class PythonEDA:
                     if infrastructure_package:
                         if package_path not in infrastructure_packages:
                             infrastructure_packages.append(package_path)
-                        submodules = Bootstrap.instance().import_submodules(
-                            package, True, HexagonalLayer.INFRASTRUCTURE
-                        )
-                        self.__class__.extend_missing_items(
-                            infrastructure_modules, submodules.values()
-                        )
                 except Exception as err:
                     PythonEDA.log_error(f"Cannot import {package_name}: {err}")
 
-        return (
-            domain_packages,
-            domain_modules,
-            infrastructure_packages,
-            infrastructure_modules,
-        )
+        return (domain_packages, domain_modules, infrastructure_packages)
 
     def find_domain_ports(self, modules: List) -> List:
         """
@@ -484,6 +452,7 @@ class PythonEDA:
 
         for module in modules:
             if Bootstrap.instance().is_domain_module(module):
+                # PrimaryPorts get resolved independently
                 interfaces = Bootstrap.instance().get_interfaces_of_module(
                     Port, module, PrimaryPort
                 )
@@ -577,12 +546,30 @@ class PythonEDA:
         Initializes this instance.
         """
         mappings = {}
-        if len(self.infrastructure_modules) == 0:
-            PythonEDA.log_error("No infrastructure modules detected!\n")
+        if len(PythonEDA.enabled_infrastructure_modules) == 0:
+            PythonEDA.log_error("No infrastructure modules enabled!\n")
         else:
+            PythonEDA.enabled_infrastructure_modules.append(
+                importlib.import_module(LoggingConfigCli.__module__)
+            )
+            PythonEDA.enabled_infrastructure_modules.append(
+                importlib.import_module(LoggingAdapter.__module__)
+            )
+            PythonEDA.enabled_infrastructure_modules.append(
+                importlib.import_module(
+                    "pythoneda.infrastructure.logging.logging_config"
+                )
+            )
+            LoggingConfigCli().entrypoint(self)
+            from pythoneda.primary_port import PrimaryPort
+
+            self._primary_ports = Bootstrap.instance().get_adapters(
+                PrimaryPort, PythonEDA.enabled_infrastructure_modules
+            )
+            mappings[PrimaryPort] = self._primary_ports
             for port in self.domain_ports:
                 implementations = Bootstrap.instance().get_adapters(
-                    port, self.infrastructure_modules
+                    port, PythonEDA.enabled_infrastructure_modules
                 )
                 if len(implementations) == 0:
                     if str(port.__module__) not in [
@@ -590,17 +577,15 @@ class PythonEDA:
                         "pythoneda.event_emitter",
                     ]:
                         PythonEDA.log_error(
-                            f"[Warning] No implementations found for {port} in {self.infrastructure_modules}\n"
+                            f"[Warning] No implementations found for {port} in {PythonEDA.enabled_infrastructure_modules}\n"
                         )
-                mappings[port] = implementations
+                else:
+                    mappings[port] = implementations
+
             from pythoneda.ports import Ports
 
             Ports.initialize(mappings)
-            from pythoneda.primary_port import PrimaryPort
 
-            self._primary_ports = Bootstrap.instance().get_adapters(
-                PrimaryPort, self.infrastructure_modules
-            )
             from pythoneda.event_listener import EventListener
             from pythoneda.event_emitter import EventEmitter
 
@@ -736,7 +721,11 @@ class PythonEDA:
         Notification the application has been launched from the CLI.
         """
         for primary_port in sorted(self.primary_ports, key=self.delegate_priority):
-            if not self.one_shot or primary_port.is_one_shot_compatible:
+            print(f"primary port -> {primary_port}")
+            if primary_port != LoggingConfigCli and (
+                not self.one_shot or primary_port.is_one_shot_compatible
+            ):
+                print("ok")
                 previous_one_shot = self.one_shot
                 port = self.get_primary_port_instance(primary_port)
                 if port is not None:
@@ -804,7 +793,7 @@ class PythonEDA:
                 PythonEDA.log_debug(f"Emitting {event.__class__}")
                 await event_emitter.emit(event)
 
-    async def accept_configure_logging(self, logConfig: Dict[str, bool]):
+    def accept_configure_logging(self, logConfig: Dict[str, bool]):
         """
         Receives information about the logging settings.
         :param logConfig: The logging config.
@@ -818,7 +807,7 @@ class PythonEDA:
         if not quiet and self.banner is not None:
             self.banner.print()
 
-    async def accept_one_shot(self, flag: bool):
+    def accept_one_shot(self, flag: bool):
         """
         Marks one-shot behavior as active or inactive.
         :param flag: Such behavior.
@@ -835,7 +824,7 @@ class PythonEDA:
         """
         result = None
 
-        for module in cls.instance().infrastructure_modules:
+        for module in PythonEDA.enabled_infrastructure_modules:
             if module.__name__ == "pythoneda.infrastructure.logging.logging_config":
                 entry = {}
                 configure_logging_function = getattr(module, "configure_logging", None)
