@@ -60,7 +60,8 @@ class Bootstrap:
             cls._singleton = cls()
         return cls._singleton
 
-    def _memoized(self, packagePath: str, type, cache: Dict, func: Callable) -> bool:
+    @staticmethod
+    def _memoized(packagePath: str, type, cache: Dict, func: Callable) -> bool:
         """
         Retrieves whether given package matches a condition provided by `func`, using a cache to avoid redundant processing.
         :param packagePath: The path of the package to check.
@@ -210,7 +211,7 @@ class Bootstrap:
         :type module: builtins.module
         :param excluding: Do not take into account matches implementing this class.
         :type excluding: type
-        :return: The list of intefaces of given module.
+        :return: The list of interfaces of given module.
         :rtype: List
         """
         result = []

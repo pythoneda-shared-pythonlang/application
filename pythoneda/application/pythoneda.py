@@ -164,8 +164,8 @@ class PythonEDA:
         """
         Sorts sys.path so that the pythoneda package is provided by the actual root package.
         """
-        rootModule = self.find_actual_root_pythoneda_package_path()
-        root = os.path.dirname(rootModule)
+        root_module = self.find_actual_root_pythoneda_package_path()
+        root = os.path.dirname(root_module)
         sys.path.remove(root)
         sys.path.insert(0, root)
 
@@ -204,6 +204,7 @@ class PythonEDA:
         elif pkg.__name__ == "" or pkg.__name__ == pkg.__package__:
             result = False
         else:
+            result = False
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=DeprecationWarning)
                 try:
@@ -245,14 +246,15 @@ class PythonEDA:
 
             # If it's a package, discover its submodules and load them
             if pkgutil.get_loader(name).is_package(name):
-                pkgpath = module.__path__
-                for _, mod_name, ispkg in pkgutil.iter_modules(pkgpath):
+                pkg_path = module.__path__
+                for _, mod_name, ispkg in pkgutil.iter_modules(pkg_path):
                     self.load_module_recursive(f"{name}.{mod_name}")
 
         except ImportError as err:
             PythonEDA.log_error(f"Cannot import {name}: {err}")
 
-    def custom_sort(self, item):
+    @staticmethod
+    def custom_sort(item):
         split_item = item.split(".")
         return len(split_item), split_item
 
@@ -287,7 +289,8 @@ class PythonEDA:
         # Condition to make sure __init__.py is the only py file and there are subdirectories
         return has_init and has_subfolders and not has_other_py_files
 
-    def find_actual_root_pythoneda_package_path(self) -> str:
+    @staticmethod
+    def find_actual_root_pythoneda_package_path() -> str:
         """
         Retrieves the path of the actual root Pythoneda package.
         :return: Such package.
@@ -393,7 +396,7 @@ class PythonEDA:
                 self.__class__.extend_missing_items(
                     infrastructure_packages, extra_infrastructure_packages
                 )
-        return (domain_packages, domain_modules, infrastructure_packages)
+        return domain_packages, domain_modules, infrastructure_packages
 
     def load_packages_under(self, namespace: str) -> tuple:
         """
@@ -436,7 +439,7 @@ class PythonEDA:
                 except Exception as err:
                     PythonEDA.log_error(f"Cannot import {package_name}: {err}")
 
-        return (domain_packages, domain_modules, infrastructure_packages)
+        return domain_packages, domain_modules, infrastructure_packages
 
     def find_domain_ports(self, modules: List) -> List:
         """
@@ -537,7 +540,7 @@ class PythonEDA:
         :return: Such instance.
         :rtype: pythoneda.PythonEDA
         """
-        if cls._singleton == None:
+        if cls._singleton is None:
             cls._singleton = cls()
         return cls._singleton
 
@@ -777,7 +780,8 @@ class PythonEDA:
 
         return result
 
-    async def emit(self, event):
+    @staticmethod
+    async def emit(event):
         """
         Emits given event.
         :param event: The event to emit.
