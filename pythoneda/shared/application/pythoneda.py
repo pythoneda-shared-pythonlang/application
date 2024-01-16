@@ -27,8 +27,8 @@ import logging
 import os
 from pathlib import Path
 import pkgutil
-from pythoneda.banner import Banner
 from pythoneda.shared.artifact import HexagonalLayer
+from pythoneda.shared.banner import Banner
 from pythoneda.shared.infrastructure.cli import LoggingConfigCli
 from pythoneda.shared.infrastructure.logging import LoggingAdapter
 import sys
@@ -61,7 +61,7 @@ class PythonEDA(Application):
         """
         Initializes the instance.
         :param banner: The project's banner.
-        :type banner: pythoneda.banner.Banner
+        :type banner: pythoneda.shared.banner.Banner
         :param file: The file where this specific instance is defined.
         :type file: str
         """
@@ -140,7 +140,7 @@ class PythonEDA(Application):
         """
         Retrieves the banner, if any.
         :return: The banner instance.
-        :rtype: pythoneda.banner.Banner
+        :rtype: pythoneda.shared.banner.Banner
         """
         return self._banner
 
