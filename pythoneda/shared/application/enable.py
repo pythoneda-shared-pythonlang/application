@@ -1,5 +1,6 @@
+# vim: set fileencoding=utf-8
 """
-pythoneda/application/enable.py
+pythoneda/shared/application/enable.py
 
 This file defines the "enable" annotation, to enable specific infrastructure modules.
 

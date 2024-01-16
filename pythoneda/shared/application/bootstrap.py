@@ -1,5 +1,6 @@
+# vim: set fileencoding=utf-8
 """
-pythoneda/application/bootstrap.py
+pythoneda/shared/application/bootstrap.py
 
 This file performs the bootstrapping af PythonEDA applications.
 
@@ -54,7 +55,7 @@ class Bootstrap:
         """
         Retrieves the singleton instance.
         :return: Such instance.
-        :rtype: pythoneda.Bootstrap
+        :rtype: pythoneda.shared.application.Bootstrap
         """
         if cls._singleton == None:
             cls._singleton = cls()
@@ -67,7 +68,7 @@ class Bootstrap:
         :param packagePath: The path of the package to check.
         :type packagePath: str
         :param type: The aspect of the package to check.
-        :type type: pythoneda.HexagonalLayer
+        :type type: pythoneda.shared.artifact.HexagonalLayer
         :param cache: The cache.
         :type cache: Dict.
         :param func: The function to call to process the package.
@@ -136,7 +137,7 @@ class Bootstrap:
         :param path: The package path.
         :type path: str
         :param type: The type of package.
-        :type type: pythoneda.application.HexagonalLayer
+        :type type: pythoneda.shared.artifact.HexagonalLayer
         :return: True if so.
         :rtype: bool
         """
@@ -267,7 +268,7 @@ class Bootstrap:
         :param package: package (name or actual module)
         :type package: builtins.module
         :param type: The type of submodules (domain or infrastructure)
-        :type type: pythoneda.application.hexagonal_layer.HexagonalLayer
+        :type type: pythoneda.shared.artifact.HexagonalLayer
         :param recursive: Whether to recursively import submodules.
         :type recursive: bool
         :rtype: dict[str, types.ModuleType]

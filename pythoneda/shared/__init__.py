@@ -1,7 +1,8 @@
+# vim: set fileencoding=utf-8
 """
-pythoneda/application/__init__.py
+pythoneda/shared/__init__.py
 
-This file ensures pythoneda.application is a package.
+This file ensures pythoneda.shared is a namespace.
 
 Copyright (C) 2023-today rydnr's pythoneda-shared-pythoneda/application
 
@@ -19,7 +20,3 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 __path__ = __import__("pkgutil").extend_path(__path__, __name__)
-
-from .bootstrap import Bootstrap
-from .pythoneda import PythonEDA
-from .enable import enable

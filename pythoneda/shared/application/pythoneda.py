@@ -1,5 +1,6 @@
+# vim: set fileencoding=utf-8
 """
-pythoneda/application/pythoneda.py
+pythoneda/shared/application/pythoneda.py
 
 This file defines PythonEDA.
 
@@ -19,6 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from .bootstrap import Bootstrap
+from eventsourcing.application import Application
 import importlib
 import inspect
 import logging
@@ -26,15 +28,15 @@ import os
 from pathlib import Path
 import pkgutil
 from pythoneda.banner import Banner
-from pythoneda.infrastructure.cli import LoggingConfigCli
-from pythoneda.infrastructure.logging import LoggingAdapter
 from pythoneda.shared.artifact import HexagonalLayer
+from pythoneda.shared.infrastructure.cli import LoggingConfigCli
+from pythoneda.shared.infrastructure.logging import LoggingAdapter
 import sys
 from typing import Callable, Dict, List
 import warnings
 
 
-class PythonEDA:
+class PythonEDA(Application):
     """
     The glue that binds adapters from infrastructure layer to ports in the domain layer.
 
@@ -450,8 +452,8 @@ class PythonEDA:
         :rtype: List
         """
         result = []
-        from pythoneda.port import Port
-        from pythoneda.primary_port import PrimaryPort
+        from pythoneda.shared.port import Port
+        from pythoneda.shared.primary_port import PrimaryPort
 
         for module in modules:
             if Bootstrap.instance().is_domain_module(module):
@@ -495,7 +497,7 @@ class PythonEDA:
         :type message: str
         """
         if PythonEDA._default_logging_configured:
-            logging.getLogger("pythoneda.application.PythonEDA").debug(message)
+            logging.getLogger("pythoneda.shared.application.PythonEDA").debug(message)
 
     @classmethod
     def log_info(cls, message: str):
@@ -505,7 +507,7 @@ class PythonEDA:
         :type message: str
         """
         if PythonEDA._default_logging_configured:
-            logging.getLogger("pythoneda.application.PythonEDA").info(message)
+            logging.getLogger("pythoneda.shared.application.PythonEDA").info(message)
         else:
             sys.stdout.write(f"{message}\n")
 
@@ -517,7 +519,7 @@ class PythonEDA:
         :type message: str
         """
         if PythonEDA._default_logging_configured:
-            logging.getLogger("pythoneda.application.PythonEDA").error(message)
+            logging.getLogger("pythoneda.shared.application.PythonEDA").error(message)
         else:
             sys.stderr.write(f"{message}\n")
 
@@ -538,7 +540,7 @@ class PythonEDA:
         """
         Retrieves the singleton instance.
         :return: Such instance.
-        :rtype: pythoneda.PythonEDA
+        :rtype: pythoneda.shared.application.PythonEDA
         """
         if cls._singleton is None:
             cls._singleton = cls()
@@ -560,11 +562,11 @@ class PythonEDA:
             )
             PythonEDA.enabled_infrastructure_modules.append(
                 importlib.import_module(
-                    "pythoneda.infrastructure.logging.logging_config"
+                    "pythoneda.shared.infrastructure.logging.logging_config"
                 )
             )
             LoggingConfigCli().entrypoint(self)
-            from pythoneda.primary_port import PrimaryPort
+            from pythoneda.shared.primary_port import PrimaryPort
 
             self._primary_ports = Bootstrap.instance().get_adapters(
                 PrimaryPort, PythonEDA.enabled_infrastructure_modules
@@ -576,8 +578,8 @@ class PythonEDA:
                 )
                 if len(implementations) == 0:
                     if str(port.__module__) not in [
-                        "pythoneda.repo",
-                        "pythoneda.event_emitter",
+                        "pythoneda.shared.repo",
+                        "pythoneda.shared.event_emitter",
                     ]:
                         PythonEDA.log_error(
                             f"[Warning] No implementations found for {port} in {PythonEDA.enabled_infrastructure_modules}\n"
@@ -585,12 +587,12 @@ class PythonEDA:
                 else:
                     mappings[port] = implementations
 
-            from pythoneda.ports import Ports
+            from pythoneda.shared.ports import Ports
 
             Ports.initialize(mappings)
 
-            from pythoneda.event_listener import EventListener
-            from pythoneda.event_emitter import EventEmitter
+            from pythoneda.shared.event_listener import EventListener
+            from pythoneda.shared.event_emitter import EventEmitter
 
             EventEmitter.register_receiver(self)
 
@@ -598,9 +600,9 @@ class PythonEDA:
         """
         Retrieves the primary port instance, if possible.
         :param primaryPort: The primary port.
-        :type primaryPort: type[pythoneda.PrimaryPort]
+        :type primaryPort: type[pythoneda.shared.PrimaryPort]
         :return: Such instance.
-        :rtype: pythoneda.PrimaryPort
+        :rtype: pythoneda.shared.PrimaryPort
         """
         from pythoneda import Ports
 
@@ -620,7 +622,7 @@ class PythonEDA:
         """
         Delegates the priority information to given primary port.
         :param primaryPort: The primary port.
-        :type primaryPort: type[pythoneda.PrimaryPort]
+        :type primaryPort: type[pythoneda.shared.PrimaryPort]
         :return: Such priority.
         :rtype: int
         """
@@ -743,7 +745,7 @@ class PythonEDA:
         """
         Accepts and processes an event, potentially generating others in response.
         :param event: The event to process.
-        :type event: pythoneda.Event
+        :type event: pythoneda.shared.Event
         :return: The generated events in response.
         :rtype: List
         """
@@ -785,7 +787,7 @@ class PythonEDA:
         """
         Emits given event.
         :param event: The event to emit.
-        :type event: pythoneda.Event
+        :type event: pythoneda.shared.Event
         """
         if event:
             from pythoneda import EventEmitter, Ports
@@ -817,6 +819,36 @@ class PythonEDA:
         """
         self.one_shot = flag
 
+    def accept_configure_eventsourcing(self, config: Dict[str, str]):
+        """
+        Receives information about the eventsourcing settings.
+        :param config: The config.
+        :type config: Dict[str, str]
+        """
+        module = config.get("PERSISTENCE_MODULE", None)
+        if module:
+            os.environ["PERSISTENCE_MODULE"] = module
+            self.apply_eventsourcing()
+        esdb_uri = config.get("EVENTSTOREDB_URI", None)
+        if esdb_uri:
+            os.environ["EVENTSTOREDB_URI"] = esdb_uri
+        esdb_root_certificates = config.get("EVENTSTOREDB_ROOT_CERTIFICATES", None)
+        if esdb_root_certificates:
+            os.environ["EVENTSTOREDB_ROOT_CERTIFICATES"] = esdb_root_certificates
+        sqlite_db_name = config.get("SQLITE_DBNAME", None)
+        if sqlite_db_name:
+            os.environ["SQLITE_DBNAME"] = sqlite_db_name
+
+    def apply_eventsourcing(self):
+        """
+        Performs changes in PythonEDA classes to support event sourcing.
+        """
+        from pythoneda import Entity, Event, ValueObject
+        from eventsourcing.domain import Aggregate
+
+        Entity.__bases__ = (ValueObject, Aggregate)
+        Event.__bases__ = (ValueObject, Aggregate.Event)
+
     @classmethod
     def get_log_config(cls) -> Callable:
         """
@@ -827,7 +859,10 @@ class PythonEDA:
         result = None
 
         for module in PythonEDA.enabled_infrastructure_modules:
-            if module.__name__ == "pythoneda.infrastructure.logging.logging_config":
+            if (
+                module.__name__
+                == "pythoneda.shared.infrastructure.logging.logging_config"
+            ):
                 entry = {}
                 configure_logging_function = getattr(module, "configure_logging", None)
                 if callable(configure_logging_function):
@@ -858,7 +893,7 @@ class PythonEDA:
         PythonEDA.config_default_logging()
 
 
-from pythoneda.application import bootstrap
+from .bootstrap import bootstrap
 import asyncio
 import importlib
 import importlib.util
@@ -866,4 +901,4 @@ import os
 import sys
 
 if __name__ == "__main__":
-    asyncio.run(PythonEDA.main("pythoneda.application.PythonEDA"))
+    asyncio.run(PythonEDA.main("pythoneda.shared.application.PythonEDA"))
