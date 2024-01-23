@@ -20,7 +20,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from .bootstrap import Bootstrap
-from eventsourcing.application import Application
+
+# from eventsourcing.application import Application
 import importlib
 import inspect
 import logging
@@ -36,7 +37,7 @@ from typing import Callable, Dict, List
 import warnings
 
 
-class PythonEDA(Application):
+class PythonEDA:
     """
     The glue that binds adapters from infrastructure layer to ports in the domain layer.
 
@@ -300,9 +301,9 @@ class PythonEDA(Application):
         """
         result = None
         for path in sys.path:
-            init_file = Path(path) / "pythoneda" / Path("__init__.py")
-            event_file = Path(path) / "pythoneda" / Path("event.py")
-            port_file = Path(path) / "pythoneda" / Path("port.py")
+            init_file = Path(path) / "pythoneda" / "shared" / Path("__init__.py")
+            event_file = Path(path) / "pythoneda" / "shared" / Path("event.py")
+            port_file = Path(path) / "pythoneda" / "shared" / Path("port.py")
             if (
                 os.path.exists(init_file)
                 and os.path.exists(event_file)
@@ -604,7 +605,7 @@ class PythonEDA(Application):
         :return: Such instance.
         :rtype: pythoneda.shared.PrimaryPort
         """
-        from pythoneda import Ports
+        from pythoneda.shared import Ports
 
         result = None
         if self.__class__.has_default_constructor(primaryPort):
@@ -752,7 +753,7 @@ class PythonEDA(Application):
         result = []
         if event:
             first_events = []
-            from pythoneda import EventListener, PrimaryPort
+            from pythoneda.shared import EventListener, PrimaryPort
 
             for listener_class in EventListener.listeners_for(event.__class__):
                 if not self.one_shot or (
@@ -790,7 +791,7 @@ class PythonEDA(Application):
         :type event: pythoneda.shared.Event
         """
         if event:
-            from pythoneda import EventEmitter, Ports
+            from pythoneda.shared import EventEmitter, Ports
 
             event_emitter = Ports.instance().resolve(EventEmitter)
             if event_emitter is not None:
@@ -843,7 +844,7 @@ class PythonEDA(Application):
         """
         Performs changes in PythonEDA classes to support event sourcing.
         """
-        from pythoneda import Entity, Event, ValueObject
+        from pythoneda.shared import Entity, Event, ValueObject
         from eventsourcing.domain import Aggregate
 
         Entity.__bases__ = (ValueObject, Aggregate)
@@ -893,7 +894,6 @@ class PythonEDA(Application):
         PythonEDA.config_default_logging()
 
 
-from .bootstrap import bootstrap
 import asyncio
 import importlib
 import importlib.util
