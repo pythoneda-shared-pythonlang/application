@@ -20,6 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from .bootstrap import Bootstrap
+from collections.abc import Iterable
 
 # from eventsourcing.application import Application
 import importlib
@@ -742,34 +743,40 @@ class PythonEDA:
         """
         pass
 
-    async def accept(self, event):  # : Event) -> Event:
+    async def accept(self, eventOrEvents):  # : Event) -> Event:
         """
         Accepts and processes an event, potentially generating others in response.
-        :param event: The event to process.
-        :type event: pythoneda.shared.Event
+        :param eventOrEvents: The event(s) to process.
+        :type eventOrEvents: Union[pythoneda.shared.Event, collections.abc.Iterable]
         :return: The generated events in response.
         :rtype: List
         """
         result = []
-        if event:
+        if eventOrEvents:
+            print(f"accepting {eventOrEvents}")
             first_events = []
             from pythoneda.shared import EventListener, PrimaryPort
 
-            for listener_class in EventListener.listeners_for(event.__class__):
-                if not self.one_shot or (
-                    not issubclass(listener_class, PrimaryPort)
-                    or listener_class.is_one_shot_compatible
-                ):
-                    PythonEDA.log_debug(
-                        f"Delegating {event.__class__.full_class_name()} to {listener_class.full_class_name()}"
-                    )
-                    resulting_events = await listener_class.accept(event)
-                    for new_event in resulting_events:
-                        asyncio.create_task(self.emit(new_event))
-                    if resulting_events and len(resulting_events) > 0:
-                        self.__class__.extend_missing_items(
-                            first_events, resulting_events
+            if isinstance(eventOrEvents, Iterable):
+                events = eventOrEvents
+            else:
+                events = [eventOrEvents]
+            for event in events:
+                for listener_class in EventListener.listeners_for(event.__class__):
+                    if not self.one_shot or (
+                        not issubclass(listener_class, PrimaryPort)
+                        or listener_class.is_one_shot_compatible
+                    ):
+                        PythonEDA.log_debug(
+                            f"Delegating {event.__class__.full_class_name()} to {listener_class.full_class_name()}"
                         )
+                        resulting_events = await listener_class.accept(event)
+                        for new_event in resulting_events:
+                            asyncio.create_task(self.emit(new_event))
+                        if resulting_events and len(resulting_events) > 0:
+                            self.__class__.extend_missing_items(
+                                first_events, resulting_events
+                            )
             if len(first_events) > 0:
                 self.__class__.extend_missing_items(result, first_events)
 
