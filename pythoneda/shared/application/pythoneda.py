@@ -753,7 +753,6 @@ class PythonEDA:
         """
         result = []
         if eventOrEvents:
-            print(f"accepting {eventOrEvents}")
             first_events = []
             from pythoneda.shared import EventListener, PrimaryPort
 
@@ -762,6 +761,7 @@ class PythonEDA:
             else:
                 events = [eventOrEvents]
             for event in events:
+                PythonEDA.log_info(f"Accepting {event}")
                 for listener_class in EventListener.listeners_for(event.__class__):
                     if not self.one_shot or (
                         not issubclass(listener_class, PrimaryPort)
