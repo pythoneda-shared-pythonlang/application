@@ -58,6 +58,7 @@ class PythonEDA:
     _default_logging_configured = False
     _singleton = None
     _enabled_infrastructure_modules = []
+    _enabled_infrastructure_adapters = []
 
     def __init__(self, banner=None, file=__file__):
         """
@@ -91,6 +92,16 @@ class PythonEDA:
         :rtype: List
         """
         return cls._enabled_infrastructure_modules
+
+    @classmethod
+    @property
+    def enabled_infrastructure_adapters(cls) -> List:
+        """
+        Retrieves the enabled infrastructure adapters.
+        :return: Such list.
+        :rtype: List
+        """
+        return cls._enabled_infrastructure_adapters
 
     @property
     def domain_packages(self) -> List:
@@ -578,6 +589,10 @@ class PythonEDA:
                 implementations = Bootstrap.instance().get_adapters(
                     port, PythonEDA.enabled_infrastructure_modules
                 )
+                for adapter in PythonEDA.enabled_infrastructure_adapters:
+                    if isinstance(adapter, port):
+                        implementations.append(adapter)
+
                 if len(implementations) == 0:
                     if str(port.__module__) not in [
                         "pythoneda.shared.repo",
@@ -800,10 +815,11 @@ class PythonEDA:
         if event:
             from pythoneda.shared import EventEmitter, Ports
 
-            event_emitter = Ports.instance().resolve(EventEmitter)
-            if event_emitter is not None:
-                PythonEDA.log_debug(f"Emitting {event.__class__}")
-                await event_emitter.emit(event)
+            event_emitters = Ports.instance().resolve(EventEmitter)
+            for event_emitter in event_emitters:
+                if event_emitter is not None:
+                    PythonEDA.log_debug(f"Emitting {event.__class__}")
+                    await event_emitter.emit(event)
 
     def accept_configure_logging(self, logConfig: Dict[str, bool]):
         """

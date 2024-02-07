@@ -20,18 +20,27 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import importlib
+import inspect
 from .pythoneda import PythonEDA
 
 
-def enable(adapterCls):
+def enable(adapterClsOrInstance):
     def decorator(cls):
-        module = importlib.import_module(adapterCls.__module__)
-        if module not in PythonEDA.enabled_infrastructure_modules:
-            adapterCls.enable()
-            PythonEDA.enabled_infrastructure_modules.append(module)
+        if inspect.isclass(adapterClsOrInstance):
+            adapterCls = adapterClsOrInstance
+            module = importlib.import_module(adapterCls.__module__)
+            if module not in PythonEDA.enabled_infrastructure_modules:
+                adapterCls.enable()
+                PythonEDA.enabled_infrastructure_modules.append(module)
+        else:
+            adapterInstance = adapterClsOrInstance
+            PythonEDA.enabled_infrastructure_adapters.append(adapterInstance)
+
         return cls
 
     return decorator
+
+
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et
 # Local Variables:
 # mode: python
