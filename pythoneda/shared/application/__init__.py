@@ -4,7 +4,7 @@ pythoneda/shared/application/__init__.py
 
 This file ensures pythoneda.shared.application is a package.
 
-Copyright (C) 2023-today rydnr's pythoneda-shared/application
+Copyright (C) 2023-today rydnr's pythoneda-shared-pythonlang/application
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@ __path__ = __import__("pkgutil").extend_path(__path__, __name__)
 from .bootstrap import Bootstrap
 from .pythoneda import PythonEDA
 from .enable import enable
+
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et
 # Local Variables:
 # mode: python

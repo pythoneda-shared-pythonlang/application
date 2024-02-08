@@ -4,7 +4,7 @@ pythoneda/shared/application/enable.py
 
 This file defines the "enable" annotation, to enable specific infrastructure modules.
 
-Copyright (C) 2023-today rydnr's pythoneda-shared/application
+Copyright (C) 2023-today rydnr's pythoneda-shared-pythonlang/application
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

@@ -4,7 +4,7 @@ pythoneda/shared/application/bootstrap.py
 
 This file performs the bootstrapping af PythonEDA applications.
 
-Copyright (C) 2023-today rydnr's pythoneda-shared/application
+Copyright (C) 2023-today rydnr's pythoneda-shared-pythonlang/application
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -295,6 +295,8 @@ class Bootstrap:
                             f"Error importing {full_name}: {err} while loading {package.__path__}"
                         )
         return results
+
+
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et
 # Local Variables:
 # mode: python
