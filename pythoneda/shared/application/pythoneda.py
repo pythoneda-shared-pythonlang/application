@@ -758,13 +758,13 @@ class PythonEDA:
         """
         pass
 
-    async def accept(self, eventOrEvents):  # : Event) -> Event:
+    async def accept(self, eventOrEvents) -> List:
         """
         Accepts and processes an event, potentially generating others in response.
         :param eventOrEvents: The event(s) to process.
         :type eventOrEvents: Union[pythoneda.shared.Event, collections.abc.Iterable]
         :return: The generated events in response.
-        :rtype: List
+        :rtype: List[pythoneda.shared.Event]
         """
         result = []
         if eventOrEvents:
@@ -792,6 +792,10 @@ class PythonEDA:
                             self.__class__.extend_missing_items(
                                 first_events, resulting_events
                             )
+                triggered = await event.maybe_trigger()
+                if len(triggered) > 0:
+                    self.__class__.extend_missing_items(first_events, triggered)
+
             if len(first_events) > 0:
                 self.__class__.extend_missing_items(result, first_events)
 
@@ -818,7 +822,7 @@ class PythonEDA:
             event_emitters = Ports.instance().resolve(EventEmitter)
             for event_emitter in event_emitters:
                 if event_emitter is not None:
-                    PythonEDA.log_debug(f"Emitting {event.__class__}")
+                    PythonEDA.log_info(f"Emitting {event.__class__}: {event}")
                     await event_emitter.emit(event)
 
     def accept_configure_logging(self, logConfig: Dict[str, bool]):
