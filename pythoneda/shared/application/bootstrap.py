@@ -25,7 +25,6 @@ import inspect
 import os
 from pathlib import Path
 import pkgutil
-from pythoneda.shared.artifact import HexagonalLayer
 import sys
 from typing import Callable, Dict, List
 import warnings
@@ -90,6 +89,8 @@ class Bootstrap:
         :return: True if so.
         :rtype: bool
         """
+        from pythoneda.shared.artifact import HexagonalLayer
+
         return self._memoized(
             packagePath,
             HexagonalLayer.DOMAIN,
@@ -105,6 +106,8 @@ class Bootstrap:
         :return: True if so.
         :rtype: bool
         """
+        from pythoneda.shared.artifact import HexagonalLayer
+
         return self._memoized(
             packagePath,
             HexagonalLayer.INFRASTRUCTURE,
@@ -131,7 +134,7 @@ class Bootstrap:
             yield current_path
             current_path = os.path.dirname(current_path)
 
-    def is_of_type(self, path: str, type: HexagonalLayer) -> bool:
+    def is_of_type(self, path: str, type) -> bool:  #: HexagonalLayer) -> bool:
         """
         Checks if given path is marked as of given type.
         :param path: The package path.
@@ -145,6 +148,8 @@ class Bootstrap:
         if (Path(os.path.dirname(path)) / f".pythoneda-{type.name.lower()}").exists():
             result = True
         else:
+            from pythoneda.shared.artifact import HexagonalLayer
+
             if type == HexagonalLayer.DOMAIN and (
                 (
                     Path(os.path.dirname(path))
@@ -181,6 +186,8 @@ class Bootstrap:
         :return: True if so.
         :rtype: bool
         """
+        from pythoneda.shared.artifact import HexagonalLayer
+
         return self._memoized(
             module.__file__,
             HexagonalLayer.DOMAIN,
@@ -196,6 +203,8 @@ class Bootstrap:
         :return: True if so.
         :rtype: bool
         """
+        from pythoneda.shared.artifact import HexagonalLayer
+
         return self._memoized(
             module.__file__,
             HexagonalLayer.INFRASTRUCTURE,
@@ -262,7 +271,9 @@ class Bootstrap:
 
         return result
 
-    def import_submodules(self, package, recursive=True, type: HexagonalLayer = None):
+    def import_submodules(
+        self, package, type, recursive=True
+    ):  #: HexagonalLayer = None, recursive = True):
         """
         Imports all submodules of a module, recursively, including subpackages.
         :param package: package (name or actual module)
@@ -283,7 +294,7 @@ class Bootstrap:
                     if recursive and is_pkg:
                         child_package = __import__(full_name, fromlist=[""])
                         results.update(
-                            self.import_submodules(child_package, recursive)
+                            self.import_submodules(child_package, None, recursive)
                         )  # type is not considered for descendants.
                 except ImportError as err:
                     if (

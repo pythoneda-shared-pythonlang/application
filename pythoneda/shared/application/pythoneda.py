@@ -29,7 +29,6 @@ import logging
 import os
 from pathlib import Path
 import pkgutil
-from pythoneda.shared.artifact import HexagonalLayer
 from pythoneda.shared.banner import Banner
 from pythoneda.shared.infrastructure.cli import LoggingConfigCli
 from pythoneda.shared.infrastructure.logging import LoggingAdapter
@@ -227,7 +226,9 @@ class PythonEDA:
                         importlib.import_module(pkg.__package__)
                     )
                 except ModuleNotFoundError as err:
-                    PythonEDA.log_error(f"Cannot import {pkg.__package__}: {err}")
+                    PythonEDA.log_error(
+                        f"Cannot import pythoneda package {pkg.__package__}: {err}"
+                    )
         return result
 
     def load_all_packages(self):
@@ -247,7 +248,9 @@ class PythonEDA:
                         try:
                             loader.load_module(pkg)
                         except Exception as err:
-                            PythonEDA.log_error(f"Cannot import {pkg}: {err}")
+                            PythonEDA.log_error(
+                                f"Cannot import package {pkg}/{type(pkg)}: {err}"
+                            )
 
         self.load_module_recursive("pythoneda")
 
@@ -266,7 +269,7 @@ class PythonEDA:
                     self.load_module_recursive(f"{name}.{mod_name}")
 
         except ImportError as err:
-            PythonEDA.log_error(f"Cannot import {name}: {err}")
+            PythonEDA.log_error(f"Cannot import module {name}: {err}")
 
     @staticmethod
     def custom_sort(item):
@@ -428,6 +431,8 @@ class PythonEDA:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
             packages = self.get_path_of_packages_under_namespace(namespace)
+            from pythoneda.shared.artifact import HexagonalLayer
+
             for package_name in packages:
                 try:
                     package = __import__(package_name, fromlist=[""])
@@ -443,7 +448,7 @@ class PythonEDA:
                         if package_path not in domain_packages:
                             domain_packages.append(package_path)
                         submodules = Bootstrap.instance().import_submodules(
-                            package, True, HexagonalLayer.DOMAIN
+                            package, HexagonalLayer.DOMAIN, True
                         )
                         self.__class__.extend_missing_items(
                             domain_modules, submodules.values()
@@ -452,7 +457,10 @@ class PythonEDA:
                         if package_path not in infrastructure_packages:
                             infrastructure_packages.append(package_path)
                 except Exception as err:
-                    PythonEDA.log_error(f"Cannot import {package_name}: {err}")
+                    PythonEDA.log_error(f"Cannot import package {package_name}: {err}")
+                    import traceback
+
+                    traceback.print_exc()
 
         return domain_packages, domain_modules, infrastructure_packages
 
