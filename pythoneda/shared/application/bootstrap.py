@@ -234,8 +234,8 @@ class Bootstrap:
                             pass
                         else:
                             result.append(self)
-            except ImportError:
-                stderr.write(f"Cannot get members of {module}\n")
+            except ImportError as err:
+                stderr.write(f"Cannot get members of {module}: {err}\n")
                 pass
         return result
 

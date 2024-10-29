@@ -606,7 +606,7 @@ class PythonEDA:
                         "pythoneda.shared.repo",
                         "pythoneda.shared.event_emitter",
                     ]:
-                        PythonEDA.log_error(
+                        PythonEDA.log_info(
                             f"[Warning] No implementations found for {port} in {PythonEDA.enabled_infrastructure_modules}\n"
                         )
                 else:
@@ -615,7 +615,6 @@ class PythonEDA:
             from pythoneda.shared.ports import Ports
 
             Ports.initialize(mappings)
-
             from pythoneda.shared.event_listener import EventListener
             from pythoneda.shared.event_emitter import EventEmitter
 
