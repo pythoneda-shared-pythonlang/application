@@ -235,24 +235,35 @@ class PythonEDA:
         """
         Loads all packages.
         """
+        self.load_module_recursive("pythoneda")
+        application_packages = self.application_packages()
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
             for importer, pkg, ispkg in pkgutil.iter_modules():
-                if (
-                    pkg != "pythoneda"
-                    and pkg != "tkinter"
-                    and pkg != "matplotlib_inline"
-                ):
+                if pkg in application_packages:
                     if ispkg:
                         loader = importer.find_module(pkg)
                         try:
                             loader.load_module(pkg)
+                            PythonEDA.log_info(f"Loaded application package {pkg}")
+
                         except Exception as err:
                             PythonEDA.log_error(
-                                f"Cannot import package {pkg}/{type(pkg)}: {err}"
+                                f"Cannot import application package {pkg}: {err}"
                             )
 
-        self.load_module_recursive("pythoneda")
+    def application_packages(self):
+        """
+        Retrieves the application packages.
+        :return: Such packages.
+        :rtype: List
+        """
+        # Get the module's fully qualified name
+        module_name = self.__class__.__module__
+
+        # Split the module name and build the list of progressively longer package paths
+        parts = module_name.split(".")
+        return [".".join(parts[: i + 1]) for i in range(len(parts))]
 
     def load_module_recursive(self, name):
         """
