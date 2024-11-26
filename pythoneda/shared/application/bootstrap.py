@@ -60,6 +60,15 @@ class Bootstrap:
             cls._singleton = cls()
         return cls._singleton
 
+    @classmethod
+    def error(cls, message: str):
+        """
+        Logs an error message.
+        :param message: The message.
+        :type message: str
+        """
+        print(message)
+
     @staticmethod
     def _memoized(packagePath: str, type, cache: Dict, func: Callable) -> bool:
         """
@@ -129,7 +138,7 @@ class Bootstrap:
 
         current_path = folder
         while (
-            Path(current_path) / "__init__.py"
+            Path(current_path) / ".pythoneda"
         ).exists() and current_path != os.path.dirname(current_path):
             yield current_path
             current_path = os.path.dirname(current_path)
@@ -267,7 +276,7 @@ class Bootstrap:
                         ):
                             result.append(inst)
             except ImportError as err:
-                Bootstrap.logger().error(f"Error importing {module}: {err}")
+                self.__class__.error(f"Error importing {module}: {err}")
 
         return result
 
@@ -286,26 +295,49 @@ class Bootstrap:
         """
         results = {}
 
-        if type is None or self.is_of_type(package.__path__[0], type):
-            for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
-                full_name = package.__name__ + "." + name
-                try:
-                    results[full_name] = __import__(full_name, fromlist=[""])
-                    if recursive and is_pkg:
-                        child_package = __import__(full_name, fromlist=[""])
-                        results.update(
-                            self.import_submodules(child_package, None, recursive)
-                        )  # type is not considered for descendants.
-                except ImportError as err:
-                    if (
-                        not ".grpc." in full_name
-                        and not ".logging." in full_name
-                        and not ".git."
-                    ):
-                        Bootstrap.logger().error(
-                            f"Error importing {full_name}: {err} while loading {package.__path__}"
-                        )
+        if package is not None:
+            if type is None or self.is_of_type(package.__path__[0], type):
+                for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
+                    full_name = package.__name__ + "." + name
+                    try:
+                        results[full_name] = self.import_package(full_name)
+                        if recursive and is_pkg:
+                            child_package = self.import_package(full_name)
+                            results.update(
+                                self.import_submodules(child_package, None, recursive)
+                            )  # type is not considered for descendants.
+                    except ImportError as err:
+                        if (
+                            not ".grpc." in full_name
+                            and not ".logging." in full_name
+                            and not ".git."
+                        ):
+                            self.__class__.error(
+                                f"Error importing {full_name}: {err} while loading {package.__path__}"
+                            )
         return results
+
+    def import_package(self, packageName: str) -> str:
+        """
+        Imports given package.
+        :param packageName: The name of the package.
+        :type packageName: str
+        :return: The path, or None if not found.
+        :rtype: str
+        """
+        try:
+            if packageName in sys.modules:
+                return sys.modules[packageName]
+            else:
+                # package = __import__(packageName, fromlist=[""])
+                package = importlib.import_module(packageName)
+                return importlib.reload(package)
+        except Exception as err:
+            self.__class__.error(f"Cannot import package {packageName}: {err}")
+            import traceback
+
+            traceback.print_exc()
+            return None
 
 
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et

@@ -23,7 +23,6 @@ from .bootstrap import Bootstrap
 from collections.abc import Iterable
 
 # from eventsourcing.application import Application
-import importlib
 import inspect
 import logging
 import os
@@ -223,7 +222,7 @@ class PythonEDA:
                 warnings.filterwarnings("ignore", category=DeprecationWarning)
                 try:
                     result = self.from_pythoneda(
-                        importlib.import_module(pkg.__package__)
+                        Bootstrap.instance().import_package(pkg.__package__)
                     )
                 except ModuleNotFoundError as err:
                     PythonEDA.log_error(
@@ -242,8 +241,8 @@ class PythonEDA:
             for importer, pkg, ispkg in pkgutil.iter_modules():
                 if pkg in application_packages:
                     if ispkg:
-                        loader = importer.find_module(pkg)
                         try:
+                            loader = importer.find_module(pkg)
                             loader.load_module(pkg)
                             PythonEDA.log_info(f"Loaded application package {pkg}")
 
@@ -271,13 +270,14 @@ class PythonEDA:
         """
         try:
             # Try to load the module/package
-            module = __import__(name, fromlist=[""])
+            module = Bootstrap.instance().import_package(name)
 
-            # If it's a package, discover its submodules and load them
-            if pkgutil.get_loader(name).is_package(name):
-                pkg_path = module.__path__
-                for _, mod_name, ispkg in pkgutil.iter_modules(pkg_path):
-                    self.load_module_recursive(f"{name}.{mod_name}")
+            if module is not None:
+                # If it's a package, discover its submodules and load them
+                if pkgutil.get_loader(name).is_package(name):
+                    pkg_path = module.__path__
+                    for _, mod_name, ispkg in pkgutil.iter_modules(pkg_path):
+                        self.load_module_recursive(f"{name}.{mod_name}")
 
         except ImportError as err:
             PythonEDA.log_error(f"Cannot import module {name}: {err}")
@@ -295,7 +295,7 @@ class PythonEDA:
         :return: True in such case.
         :rtype: bool
         """
-        has_init = False
+        has_marker = False
         has_other_py_files = False
         has_subfolders = False
 
@@ -304,19 +304,18 @@ class PythonEDA:
             path = os.path.join(directory, name)
 
             # Check if the file is __init__.py
-            if os.path.isfile(path) and name == "__init__.py":
-                has_init = True
+            if os.path.isfile(path) and name == ".pythoneda":
+                has_marker = True
 
             # Check if the file is not __init__.py
-            if os.path.isfile(path) and name != "__init__.py" and name.endswith(".py"):
+            if os.path.isfile(path) and name != ".pythoneda" and name.endswith(".py"):
                 has_other_py_files = True
 
             # Check if there are subdirectories
             if os.path.isdir(path):
                 has_subfolders = True
 
-        # Condition to make sure __init__.py is the only py file and there are subdirectories
-        return has_init and has_subfolders and not has_other_py_files
+        return has_marker and has_subfolders and not has_other_py_files
 
     @staticmethod
     def find_actual_root_pythoneda_package_path() -> str:
@@ -327,11 +326,11 @@ class PythonEDA:
         """
         result = None
         for path in sys.path:
-            init_file = Path(path) / "pythoneda" / "shared" / Path("__init__.py")
+            marker_file = Path(path) / "pythoneda" / "shared" / Path(".pythoneda")
             event_file = Path(path) / "pythoneda" / "shared" / Path("event.py")
             port_file = Path(path) / "pythoneda" / "shared" / Path("port.py")
             if (
-                os.path.exists(init_file)
+                os.path.exists(marker_file)
                 and os.path.exists(event_file)
                 and os.path.exists(port_file)
             ):
@@ -370,7 +369,7 @@ class PythonEDA:
         result = {}
 
         for path in sys.path:
-            init_file = Path(path) / namespace / Path("__init__.py")
+            init_file = Path(path) / namespace / Path(".pythoneda")
             if os.path.exists(init_file):
                 # walk through all files and directories in site-packages
                 for root, dirs, _ in os.walk(path):
@@ -380,7 +379,7 @@ class PythonEDA:
                         full_path = os.path.join(root, dir)
 
                         # if this directory is a package
-                        if os.path.isfile(os.path.join(full_path, "__init__.py")):
+                        if os.path.isfile(os.path.join(full_path, ".pythoneda")):
                             # get the package name
                             package_name = full_path[len(path) + 1 :].replace(
                                 os.sep, "."
@@ -444,10 +443,10 @@ class PythonEDA:
             packages = self.get_path_of_packages_under_namespace(namespace)
             from pythoneda.shared.artifact import HexagonalLayer
 
+            print(f"Processing {namespace} packages in this order: {packages}")
             for package_name in packages:
                 try:
-                    package = __import__(package_name, fromlist=[""])
-                    package = importlib.reload(package)
+                    package = Bootstrap.instance().import_package(package_name)
                     package_path = packages[package_name]
                     domain_package = Bootstrap.instance().is_domain_package(
                         package_path
@@ -561,11 +560,15 @@ class PythonEDA:
         Runs the application from the command line.
         :param name: The application name.
         :type name: str
+        :return: The PythonEDA instance.
+        :rtype: pythoneda.shared.application.PythonEDA
         """
         instance = cls.instance()
         await instance.after_bootstrap()
 
         await instance.accept_input()
+
+        return instance
 
     @classmethod
     def instance(cls):
