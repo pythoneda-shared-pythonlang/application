@@ -23,6 +23,7 @@ from .bootstrap import Bootstrap
 from collections.abc import Iterable
 
 # from eventsourcing.application import Application
+import importlib
 import inspect
 import logging
 import os
@@ -222,7 +223,8 @@ class PythonEDA:
                 warnings.filterwarnings("ignore", category=DeprecationWarning)
                 try:
                     result = self.from_pythoneda(
-                        Bootstrap.instance().import_package(pkg.__package__)
+                        # Bootstrap.instance().import_package(pkg.__package__)
+                        importlib.import_module(pkg.__package__)
                     )
                 except ModuleNotFoundError as err:
                     PythonEDA.log_error(
@@ -234,35 +236,24 @@ class PythonEDA:
         """
         Loads all packages.
         """
-        self.load_module_recursive("pythoneda")
-        application_packages = self.application_packages()
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
             for importer, pkg, ispkg in pkgutil.iter_modules():
-                if pkg in application_packages:
+                if pkg not in {"pythoneda", "asyncio", "tkinter", "matplotlib_inline"}:
                     if ispkg:
-                        try:
-                            loader = importer.find_module(pkg)
-                            loader.load_module(pkg)
-                            PythonEDA.log_info(f"Loaded application package {pkg}")
+                        # Use find_spec instead of find_module
+                        spec = importer.find_spec(pkg)
+                        if spec is not None:
+                            try:
+                                # Load the module using the spec
+                                module = importlib.util.module_from_spec(spec)
+                                spec.loader.exec_module(module)
+                            except Exception as err:
+                                PythonEDA.log_error(
+                                    f"Cannot import package {pkg}/{type(pkg)}: {err}"
+                                )
 
-                        except Exception as err:
-                            PythonEDA.log_error(
-                                f"Cannot import application package {pkg}: {err}"
-                            )
-
-    def application_packages(self):
-        """
-        Retrieves the application packages.
-        :return: Such packages.
-        :rtype: List
-        """
-        # Get the module's fully qualified name
-        module_name = self.__class__.__module__
-
-        # Split the module name and build the list of progressively longer package paths
-        parts = module_name.split(".")
-        return [".".join(parts[: i + 1]) for i in range(len(parts))]
+        self.load_module_recursive("pythoneda")
 
     def load_module_recursive(self, name):
         """
@@ -270,14 +261,14 @@ class PythonEDA:
         """
         try:
             # Try to load the module/package
-            module = Bootstrap.instance().import_package(name)
+            #            module = Bootstrap.instance().import_package(name)
+            module = __import__(name, fromlist=[""])
 
-            if module is not None:
-                # If it's a package, discover its submodules and load them
-                if pkgutil.get_loader(name).is_package(name):
-                    pkg_path = module.__path__
-                    for _, mod_name, ispkg in pkgutil.iter_modules(pkg_path):
-                        self.load_module_recursive(f"{name}.{mod_name}")
+            # If it's a package, discover its submodules and load them
+            if pkgutil.get_loader(name).is_package(name):
+                pkg_path = module.__path__
+                for _, mod_name, ispkg in pkgutil.iter_modules(pkg_path):
+                    self.load_module_recursive(f"{name}.{mod_name}")
 
         except ImportError as err:
             PythonEDA.log_error(f"Cannot import module {name}: {err}")
@@ -295,7 +286,7 @@ class PythonEDA:
         :return: True in such case.
         :rtype: bool
         """
-        has_marker = False
+        has_init = False
         has_other_py_files = False
         has_subfolders = False
 
@@ -304,18 +295,19 @@ class PythonEDA:
             path = os.path.join(directory, name)
 
             # Check if the file is __init__.py
-            if os.path.isfile(path) and name == ".pythoneda":
-                has_marker = True
+            if os.path.isfile(path) and name == "__init__.py":
+                has_init = True
 
             # Check if the file is not __init__.py
-            if os.path.isfile(path) and name != ".pythoneda" and name.endswith(".py"):
+            if os.path.isfile(path) and name != "__init__.py" and name.endswith(".py"):
                 has_other_py_files = True
 
             # Check if there are subdirectories
             if os.path.isdir(path):
                 has_subfolders = True
 
-        return has_marker and has_subfolders and not has_other_py_files
+        # Condition to make sure __init__.py is the only py file and there are subdirectories
+        return has_init and has_subfolders and not has_other_py_files
 
     @staticmethod
     def find_actual_root_pythoneda_package_path() -> str:
@@ -326,11 +318,11 @@ class PythonEDA:
         """
         result = None
         for path in sys.path:
-            marker_file = Path(path) / "pythoneda" / "shared" / Path(".pythoneda")
+            init_file = Path(path) / "pythoneda" / "shared" / Path("__init__.py")
             event_file = Path(path) / "pythoneda" / "shared" / Path("event.py")
             port_file = Path(path) / "pythoneda" / "shared" / Path("port.py")
             if (
-                os.path.exists(marker_file)
+                os.path.exists(init_file)
                 and os.path.exists(event_file)
                 and os.path.exists(port_file)
             ):
@@ -369,7 +361,7 @@ class PythonEDA:
         result = {}
 
         for path in sys.path:
-            init_file = Path(path) / namespace / Path(".pythoneda")
+            init_file = Path(path) / namespace / Path("__init__.py")
             if os.path.exists(init_file):
                 # walk through all files and directories in site-packages
                 for root, dirs, _ in os.walk(path):
@@ -379,7 +371,7 @@ class PythonEDA:
                         full_path = os.path.join(root, dir)
 
                         # if this directory is a package
-                        if os.path.isfile(os.path.join(full_path, ".pythoneda")):
+                        if os.path.isfile(os.path.join(full_path, "__init__.py")):
                             # get the package name
                             package_name = full_path[len(path) + 1 :].replace(
                                 os.sep, "."
@@ -443,10 +435,11 @@ class PythonEDA:
             packages = self.get_path_of_packages_under_namespace(namespace)
             from pythoneda.shared.artifact import HexagonalLayer
 
-            print(f"Processing {namespace} packages in this order: {packages}")
             for package_name in packages:
                 try:
-                    package = Bootstrap.instance().import_package(package_name)
+                    # package = Bootstrap.instance().import_package(package_name)
+                    package = __import__(package_name, fromlist=[""])
+                    package = importlib.reload(package)
                     package_path = packages[package_name]
                     domain_package = Bootstrap.instance().is_domain_package(
                         package_path
@@ -560,15 +553,11 @@ class PythonEDA:
         Runs the application from the command line.
         :param name: The application name.
         :type name: str
-        :return: The PythonEDA instance.
-        :rtype: pythoneda.shared.application.PythonEDA
         """
         instance = cls.instance()
         await instance.after_bootstrap()
 
         await instance.accept_input()
-
-        return instance
 
     @classmethod
     def instance(cls):
@@ -590,12 +579,15 @@ class PythonEDA:
             PythonEDA.log_error("No infrastructure modules enabled!\n")
         else:
             PythonEDA.enabled_infrastructure_modules.append(
+                # Bootstrap.instance().import_package(LoggingConfigCli.__module__) # not tested
                 importlib.import_module(LoggingConfigCli.__module__)
             )
             PythonEDA.enabled_infrastructure_modules.append(
+                # Bootstrap.instance().import_package(LoggingAdapter.__module__) # not tested
                 importlib.import_module(LoggingAdapter.__module__)
             )
             PythonEDA.enabled_infrastructure_modules.append(
+                # Bootstrap.instance().import_package("pythoneda.shared.infrastructure.logging.logging_config") # not tested
                 importlib.import_module(
                     "pythoneda.shared.infrastructure.logging.logging_config"
                 )
@@ -620,8 +612,12 @@ class PythonEDA:
                         "pythoneda.shared.repo",
                         "pythoneda.shared.event_emitter",
                     ]:
+                        items = [
+                            module.__name__
+                            for module in PythonEDA.enabled_infrastructure_modules
+                        ]
                         PythonEDA.log_info(
-                            f"[Warning] No implementations found for {port} in {PythonEDA.enabled_infrastructure_modules}\n"
+                            f"[Warning] No implementations found for {port} in {items}"
                         )
                 else:
                     mappings[port] = implementations
@@ -940,6 +936,19 @@ class PythonEDA:
         """
         super().__init_subclass__(**kwargs)
         PythonEDA.config_default_logging()
+
+    def application_packages(self):
+        """
+        Retrieves the application packages.
+        :return: Such packages.
+        :rtype: List
+        """
+        # Get the module's fully qualified name
+        module_name = self.__class__.__module__
+
+        # Split the module name and build the list of progressively longer package paths
+        parts = module_name.split(".")
+        return [".".join(parts[: i + 1]) for i in range(len(parts))]
 
 
 import asyncio

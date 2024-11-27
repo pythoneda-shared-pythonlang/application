@@ -67,7 +67,7 @@ class Bootstrap:
         :param message: The message.
         :type message: str
         """
-        print(message)
+        print(message, file=sys.stderr)
 
     @staticmethod
     def _memoized(packagePath: str, type, cache: Dict, func: Callable) -> bool:
@@ -138,7 +138,7 @@ class Bootstrap:
 
         current_path = folder
         while (
-            Path(current_path) / ".pythoneda"
+            Path(current_path) / "__init__.py"
         ).exists() and current_path != os.path.dirname(current_path):
             yield current_path
             current_path = os.path.dirname(current_path)
@@ -244,7 +244,7 @@ class Bootstrap:
                         else:
                             result.append(self)
             except ImportError as err:
-                stderr.write(f"Cannot get members of {module}: {err}\n")
+                self.__class__.error(f"Cannot get members of {module}: {err}")
                 pass
         return result
 
@@ -276,7 +276,7 @@ class Bootstrap:
                         ):
                             result.append(inst)
             except ImportError as err:
-                self.__class__.error(f"Error importing {module}: {err}")
+                Bootstrap.logger().error(f"Error importing {module}: {err}")
 
         return result
 
@@ -295,26 +295,27 @@ class Bootstrap:
         """
         results = {}
 
-        if package is not None:
-            if type is None or self.is_of_type(package.__path__[0], type):
-                for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
-                    full_name = package.__name__ + "." + name
-                    try:
-                        results[full_name] = self.import_package(full_name)
-                        if recursive and is_pkg:
-                            child_package = self.import_package(full_name)
-                            results.update(
-                                self.import_submodules(child_package, None, recursive)
-                            )  # type is not considered for descendants.
-                    except ImportError as err:
-                        if (
-                            not ".grpc." in full_name
-                            and not ".logging." in full_name
-                            and not ".git."
-                        ):
-                            self.__class__.error(
-                                f"Error importing {full_name}: {err} while loading {package.__path__}"
-                            )
+        if type is None or self.is_of_type(package.__path__[0], type):
+            for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
+                full_name = package.__name__ + "." + name
+                try:
+                    # results[full_name] = __import__(full_name, fromlist=[""])
+                    results[full_name] = self.import_package(full_name)
+                    if recursive and is_pkg:
+                        # child_package = __import__(full_name, fromlist=[""])
+                        child_package = self.import_package(full_name)
+                        results.update(
+                            self.import_submodules(child_package, None, recursive)
+                        )  # type is not considered for descendants.
+                except ImportError as err:
+                    if (
+                        not ".grpc." in full_name
+                        and not ".logging." in full_name
+                        and not ".git."
+                    ):
+                        self.__class__.error(
+                            f"Error importing {full_name}: {err} while loading {package.__path__}"
+                        )
         return results
 
     def import_package(self, packageName: str) -> str:
