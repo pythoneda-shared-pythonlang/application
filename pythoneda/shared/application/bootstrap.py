@@ -295,27 +295,31 @@ class Bootstrap:
         """
         results = {}
 
-        if type is None or self.is_of_type(package.__path__[0], type):
-            for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
-                full_name = package.__name__ + "." + name
-                try:
-                    # results[full_name] = __import__(full_name, fromlist=[""])
-                    results[full_name] = self.import_package(full_name)
-                    if recursive and is_pkg:
-                        # child_package = __import__(full_name, fromlist=[""])
-                        child_package = self.import_package(full_name)
-                        results.update(
-                            self.import_submodules(child_package, None, recursive)
-                        )  # type is not considered for descendants.
-                except ImportError as err:
-                    if (
-                        not ".grpc." in full_name
-                        and not ".logging." in full_name
-                        and not ".git."
-                    ):
-                        self.__class__.error(
-                            f"Error importing {full_name}: {err} while loading {package.__path__}"
-                        )
+        if type is None or (
+            package is not None and self.is_of_type(package.__path__[0], type)
+        ):
+            for loader, name, is_pkg in pkgutil.walk_packages(
+                package.__path__, package.__name__ + "."
+            ):
+                if not name.split(".")[-1].startswith("_"):
+                    try:
+                        # results[full_name] = __import__(name, fromlist=[""])
+                        results[name] = self.import_package(name)
+                        if recursive and is_pkg:
+                            # child_package = __import__(name, fromlist=[""])
+                            child_package = self.import_package(name)
+                            results.update(
+                                self.import_submodules(child_package, None, recursive)
+                            )  # type is not considered for descendants.
+                    except ImportError as err:
+                        if (
+                            not ".grpc." in name
+                            and not ".logging." in name
+                            and not ".git."
+                        ):
+                            self.__class__.error(
+                                f"Error importing {name}: {err} while loading {package.__path__}"
+                            )
         return results
 
     def import_package(self, packageName: str) -> str:
@@ -338,6 +342,8 @@ class Bootstrap:
             import traceback
 
             traceback.print_exc()
+            self.__class__.error("")
+
             return None
 
 

@@ -579,16 +579,13 @@ class PythonEDA:
             PythonEDA.log_error("No infrastructure modules enabled!\n")
         else:
             PythonEDA.enabled_infrastructure_modules.append(
-                # Bootstrap.instance().import_package(LoggingConfigCli.__module__) # not tested
-                importlib.import_module(LoggingConfigCli.__module__)
+                Bootstrap.instance().import_package(LoggingConfigCli.__module__)
             )
             PythonEDA.enabled_infrastructure_modules.append(
-                # Bootstrap.instance().import_package(LoggingAdapter.__module__) # not tested
-                importlib.import_module(LoggingAdapter.__module__)
+                Bootstrap.instance().import_package(LoggingAdapter.__module__)
             )
             PythonEDA.enabled_infrastructure_modules.append(
-                # Bootstrap.instance().import_package("pythoneda.shared.infrastructure.logging.logging_config") # not tested
-                importlib.import_module(
+                Bootstrap.instance().import_package(
                     "pythoneda.shared.infrastructure.logging.logging_config"
                 )
             )
@@ -611,6 +608,7 @@ class PythonEDA:
                     if str(port.__module__) not in [
                         "pythoneda.shared.repo",
                         "pythoneda.shared.event_emitter",
+                        "pythoneda.shared.artifact.artifact_repository",
                     ]:
                         items = [
                             module.__name__
@@ -913,7 +911,9 @@ class PythonEDA:
                 if callable(configure_logging_function):
                     result = configure_logging_function
                 else:
-                    sys.stderr.write(f"Error in {module.__file__}: configure_logging\n")
+                    PythonEDA.log_error(
+                        f"Error in {module.__file__}: configure_logging"
+                    )
         return result
 
     @classmethod
