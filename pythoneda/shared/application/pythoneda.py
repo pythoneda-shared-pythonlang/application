@@ -239,19 +239,23 @@ class PythonEDA:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
             for importer, pkg, ispkg in pkgutil.iter_modules():
-                if pkg not in {"pythoneda", "asyncio", "tkinter", "matplotlib_inline"}:
-                    if ispkg:
-                        # Use find_spec instead of find_module
-                        spec = importer.find_spec(pkg)
-                        if spec is not None:
-                            try:
-                                # Load the module using the spec
-                                module = importlib.util.module_from_spec(spec)
-                                spec.loader.exec_module(module)
-                            except Exception as err:
-                                PythonEDA.log_error(
-                                    f"Cannot import package {pkg}/{type(pkg)}: {err}"
-                                )
+                if (
+                    ispkg
+                    and pkg
+                    not in {"pythoneda", "asyncio", "tkinter", "matplotlib_inline"}
+                    and pkg not in sys.modules
+                ):
+                    # Use find_spec instead of find_module
+                    spec = importer.find_spec(pkg)
+                    if spec is not None:
+                        try:
+                            # Load the module using the spec
+                            module = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(module)
+                        except Exception as err:
+                            PythonEDA.log_error(
+                                f"Cannot import package {pkg}/{type(pkg)}: {err}"
+                            )
 
         self.load_module_recursive("pythoneda")
 
@@ -416,6 +420,7 @@ class PythonEDA:
                 self.__class__.extend_missing_items(
                     infrastructure_packages, extra_infrastructure_packages
                 )
+        PythonEDA.log_debug(f"infrastructure packages found: {infrastructure_packages}")
         return domain_packages, domain_modules, infrastructure_packages
 
     def load_packages_under(self, namespace: str) -> tuple:
