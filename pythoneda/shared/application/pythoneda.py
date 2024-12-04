@@ -796,7 +796,6 @@ class PythonEDA:
             else:
                 events = [eventOrEvents]
             for event in events:
-                PythonEDA.log_info(f"Accepting {event}")
                 for listener_class in EventListener.listeners_for(event.__class__):
                     if not self.one_shot or (
                         not issubclass(listener_class, PrimaryPort)
@@ -842,7 +841,9 @@ class PythonEDA:
             event_emitters = Ports.instance().resolve(EventEmitter)
             for event_emitter in event_emitters:
                 if event_emitter is not None:
-                    PythonEDA.log_info(f"Emitting {event.__class__}: {event}")
+                    PythonEDA.log_info(
+                        f"Emitting {event.__class__.__name__}: {event} via {event_emitter}"
+                    )
                     await event_emitter.emit(event)
 
     def accept_configure_logging(self, logConfig: Dict[str, bool]):
