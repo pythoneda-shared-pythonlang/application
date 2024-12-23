@@ -22,15 +22,29 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import importlib
 import inspect
 from .pythoneda import PythonEDA
+from typing import Dict, Tuple
 
 
-def enable(adapterClsOrInstance):
+def enable(adapterClsOrInstance, *args: Tuple, **kwargs: Dict):
+    """
+    Decorator that enables an adapter class or instance.
+    If you pass a class, we import the module and call adapterCls.enable(*args, **kwargs).
+    If you pass an instance, we add it to the enabled infrastructure adapters.
+    :param adapterClsOrInstance: The adapter class or instance to enable.
+    :type adapterClsOrInstance: Type or object
+    :param args: The arguments to pass to the adapter class enable method.
+    :type args: Tuple
+    :param kwargs: The keyword arguments to pass to the adapter class enable method.
+    :type kwargs: Dict
+    :return: The decorated class.
+    """
+
     def decorator(cls):
         if inspect.isclass(adapterClsOrInstance):
             adapterCls = adapterClsOrInstance
             module = importlib.import_module(adapterCls.__module__)
             if module not in PythonEDA.enabled_infrastructure_modules:
-                adapterCls.enable()
+                adapterCls.enable(*args, **kwargs)
                 PythonEDA.enabled_infrastructure_modules.append(module)
         else:
             adapterInstance = adapterClsOrInstance
