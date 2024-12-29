@@ -29,15 +29,16 @@ import logging
 import os
 from pathlib import Path
 import pkgutil
+from pythoneda.shared import Invariant, Invariants, PythonedaApplication
 from pythoneda.shared.banner import Banner
 from pythoneda.shared.infrastructure.cli import LoggingConfigCli
 from pythoneda.shared.infrastructure.logging import LoggingAdapter
 import sys
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Type
 import warnings
 
 
-class PythonEDA:
+class PythonEDA(PythonedaApplication):
     """
     The glue that binds adapters from infrastructure layer to ports in the domain layer.
 
@@ -54,20 +55,23 @@ class PythonEDA:
         - Domain aggregates.
     """
 
-    _default_logging_configured = False
     _singleton = None
     _enabled_infrastructure_modules = []
     _enabled_infrastructure_adapters = []
+    _logging_configured = False
+    _pending_logging = []
 
-    def __init__(self, banner=None, file=__file__):
+    def __init__(self, name: str, banner=None, file=__file__):
         """
         Initializes the instance.
+        :param name: The application name.
+        :type name: str
         :param banner: The project's banner.
         :type banner: pythoneda.shared.banner.Banner
         :param file: The file where this specific instance is defined.
         :type file: str
         """
-        super().__init__()
+        super().__init__(name)
         self._primary_ports = []
         self._banner = banner
         self.fix_syspath(file)
@@ -494,39 +498,16 @@ class PythonEDA:
         return result
 
     @classmethod
-    def config_default_logging(cls):
-        if not PythonEDA._default_logging_configured:
-            initial_level = logging.DEBUG
-            default_logger = logging.getLogger()
-            handlers_to_remove = []
-            for handler in default_logger.handlers:
-                if isinstance(handler, logging.StreamHandler):
-                    handlers_to_remove.append(handler)
-            for handler in handlers_to_remove:
-                default_logger.removeHandler(handler)
-            console_handler = logging.StreamHandler(sys.stdout)
-            console_handler.setLevel(initial_level)
-            formatter = logging.Formatter(
-                "%(asctime)s [%(name)s] - %(levelname)s - %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S",
-            )
-            console_handler.setFormatter(formatter)
-            default_logger.setLevel(initial_level)
-            default_logger.addHandler(console_handler)
-            for name in ["asyncio", "git"]:
-                specific_logger = logging.getLogger(name)
-                specific_logger.setLevel(logging.WARNING)
-            PythonEDA._default_logging_configured = True
-
-    @classmethod
     def log_debug(cls, message: str):
         """
         Prints a debug message.
         :param message: The message to log.
         :type message: str
         """
-        if PythonEDA._default_logging_configured:
-            logging.getLogger("pythoneda.shared.application.PythonEDA").debug(message)
+        if cls._logging_configured:
+            cls.logger().debug(message)
+        else:
+            cls._pending_logging.append(("debug", message))
 
     @classmethod
     def log_info(cls, message: str):
@@ -535,10 +516,10 @@ class PythonEDA:
         :param message: The message to log.
         :type message: str
         """
-        if PythonEDA._default_logging_configured:
-            logging.getLogger("pythoneda.shared.application.PythonEDA").info(message)
+        if cls._logging_configured:
+            cls.logger().info(message)
         else:
-            sys.stdout.write(f"{message}\n")
+            cls._pending_logging.append(("info", message))
 
     @classmethod
     def log_error(cls, message: str):
@@ -547,10 +528,10 @@ class PythonEDA:
         :param message: The message to log.
         :type message: str
         """
-        if PythonEDA._default_logging_configured:
-            logging.getLogger("pythoneda.shared.application.PythonEDA").error(message)
+        if cls._logging_configured:
+            cls.logger().error(message)
         else:
-            sys.stderr.write(f"{message}\n")
+            cls._pending_logging.append(("error", message))
 
     @classmethod
     async def main(cls, name: str):
@@ -560,9 +541,20 @@ class PythonEDA:
         :type name: str
         """
         instance = cls.instance()
+        instance.bind_invariants()
         await instance.after_bootstrap()
 
         await instance.accept_input()
+
+    def bind_invariants(self):
+        """
+        Binds any invariants.
+        """
+        Invariants.instance().bind(
+            Invariant[PythonedaApplication](
+                self, "pythoneda.shared.PythonedaApplication"
+            )
+        )
 
     @classmethod
     def instance(cls):
@@ -579,6 +571,8 @@ class PythonEDA:
         """
         Initializes this instance.
         """
+        from pythoneda.shared.primary_port import PrimaryPort
+
         mappings = {}
         if len(PythonEDA.enabled_infrastructure_modules) == 0:
             PythonEDA.log_error("No infrastructure modules enabled!\n")
@@ -595,7 +589,6 @@ class PythonEDA:
                 )
             )
             LoggingConfigCli().entrypoint(self)
-            from pythoneda.shared.primary_port import PrimaryPort
 
             self._primary_ports = Bootstrap.instance().get_adapters(
                 PrimaryPort, PythonEDA.enabled_infrastructure_modules
@@ -628,32 +621,30 @@ class PythonEDA:
             from pythoneda.shared.ports import Ports
 
             Ports.initialize(mappings)
+
+            self.__class__._logging_configured = True
+            for level, message in self.__class__._pending_logging:
+                if level == "debug":
+                    self.__class__.logger().debug(message)
+                elif level == "info":
+                    self.__class__.logger().info(message)
+                elif level == "error":
+                    self.__class__.logger().error(message)
+
             from pythoneda.shared.event_listener import EventListener
             from pythoneda.shared.event_emitter import EventEmitter
 
             EventEmitter.register_receiver(self)
 
-    def get_primary_port_instance(self, primaryPort):
+    def get_primary_port_instance(self, primaryPort: Type):
         """
         Retrieves the primary port instance, if possible.
         :param primaryPort: The primary port.
-        :type primaryPort: type[pythoneda.shared.PrimaryPort]
+        :type primaryPort: Type[pythoneda.shared.PrimaryPort]
         :return: Such instance.
         :rtype: pythoneda.shared.PrimaryPort
         """
-        from pythoneda.shared import Ports
-
-        result = None
-        if self.__class__.has_default_constructor(primaryPort):
-            result = primaryPort()
-        if result is None and self.__class__.has_instance_method(primaryPort):
-            result = primaryPort.instance()
-        if result is None and self.__class__.has_constructor_with_app_argument(
-            primaryPort
-        ):
-            result = primaryPort(self)
-
-        return result
+        return primaryPort()
 
     def delegate_priority(self, primaryPort) -> int:
         """
@@ -841,9 +832,6 @@ class PythonEDA:
             event_emitters = Ports.instance().resolve(EventEmitter)
             for event_emitter in event_emitters:
                 if event_emitter is not None:
-                    PythonEDA.log_info(
-                        f"Emitting {event.__class__.__name__}: {event} via {event_emitter}"
-                    )
                     await event_emitter.emit(event)
 
     def accept_configure_logging(self, logConfig: Dict[str, bool]):
@@ -854,7 +842,12 @@ class PythonEDA:
         """
         module_function = self.__class__.get_log_config()
         if module_function:
-            module_function(logConfig["info"], logConfig["debug"], logConfig["quiet"])
+            module_function(
+                logConfig["info"],
+                logConfig["debug"],
+                logConfig["trace"],
+                logConfig["quiet"],
+            )
 
         quiet = logConfig["quiet"]
         if not quiet and self.banner is not None:
@@ -941,7 +934,6 @@ class PythonEDA:
         :type kwargs: Dict
         """
         super().__init_subclass__(**kwargs)
-        PythonEDA.config_default_logging()
 
     def application_packages(self):
         """
