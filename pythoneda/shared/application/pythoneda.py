@@ -83,7 +83,7 @@ class PythonEDA(PythonedaApplication):
             self._infrastructure_packages,
         ) = self.load_pythoneda_packages()
         self._domain_ports = self.find_domain_ports(self._domain_modules)
-        #        print(f"** 3. __init__({name}). Domain ports: {self._domain_ports}")
+        # print(f"** 3. __init__({name}). Domain ports: {self._domain_ports}")
         self._one_shot = False
         self.initialize()
 
@@ -548,17 +548,16 @@ class PythonEDA(PythonedaApplication):
         print(message, file=sys.stderr)
 
     @classmethod
-    async def main(cls, name: str = None):
+    async def main(cls, name: str = None) -> PythonedaApplication:
         """
         Runs the application from the command line.
         :param name: The application name.
         :type name: str
         """
-        instance = cls.instance(name)
-        instance.bind_invariants()
-        await instance.after_bootstrap()
+        result = await cls.instance(name)
+        await result.accept_input()
 
-        await instance.accept_input()
+        return result
 
     def bind_invariants(self):
         """
@@ -571,7 +570,7 @@ class PythonEDA(PythonedaApplication):
         )
 
     @classmethod
-    def instance(cls, name: str = None) -> PythonedaApplication:
+    async def instance(cls, name: str = None) -> PythonedaApplication:
         """
         Retrieves the singleton instance.
         :param name: The name.
@@ -583,6 +582,9 @@ class PythonEDA(PythonedaApplication):
             if name is None:
                 name = cls.default_name()
             cls._singleton = cls(name)
+            cls._singleton.bind_invariants()
+            await cls._singleton.after_bootstrap()
+
         return cls._singleton
 
     def initialize(self):
