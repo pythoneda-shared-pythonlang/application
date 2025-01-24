@@ -143,6 +143,55 @@ class Bootstrap:
             yield current_path
             current_path = os.path.dirname(current_path)
 
+    def get_folder_of_parent_package(self, path) -> str:
+        """
+        Retrieves the folder of the parent packages.
+        :param path: The path.
+        :type path: str
+        :return: The parent folder.
+        :rtype: str
+        """
+        result = None
+
+        folder = os.path.dirname(path.rstrip("/"))
+
+        if (Path(folder) / "__init__.py").exists() and folder != os.path.dirname(
+            folder
+        ):
+            result = folder
+
+        return result
+
+    def single_path_is_of_type(self, path: str, type) -> bool:
+        """
+        Checks if given path, and just that, is marked as of given type.
+        :param path: The package path.
+        :type path: str
+        :param type: The type of package.
+        :type type: pythoneda.shared.artifact.HexagonalLayer
+        :return: True if so.
+        :rtype: bool
+        """
+        folder = path
+        if not os.path.isdir(path.rstrip("/")):
+            folder = os.path.dirname(path)
+        return (Path(folder) / f".pythoneda-{type.name.lower()}").exists()
+
+    def single_path_is_not_of_type(self, path: str, type) -> bool:
+        """
+        Checks if given path, and just that, is marked as a different type.
+        :param path: The package path.
+        :type path: str
+        :param type: The type of package.
+        :type type: pythoneda.shared.artifact.HexagonalLayer
+        :return: True if so.
+        :rtype: bool
+        """
+        return any(
+            self.single_path_is_of_type(path, other_type)
+            for other_type in type.all_but()
+        )
+
     def is_of_type(self, path: str, type) -> bool:  #: HexagonalLayer) -> bool:
         """
         Checks if given path is marked as of given type.
@@ -153,37 +202,20 @@ class Bootstrap:
         :return: True if so.
         :rtype: bool
         """
-        result = False
-        if (Path(os.path.dirname(path)) / f".pythoneda-{type.name.lower()}").exists():
-            result = True
-        else:
-            from pythoneda.shared.artifact import HexagonalLayer
+        import sys
 
-            if type == HexagonalLayer.DOMAIN and (
-                (
-                    Path(os.path.dirname(path))
-                    / f".pythoneda-{HexagonalLayer.INFRASTRUCTURE.name.lower()}"
-                ).exists()
-                or (
-                    Path(os.path.dirname(path))
-                    / f".pythoneda-{HexagonalLayer.APPLICATION.name.lower()}"
-                ).exists()
-            ):
-                result = False
-            else:
-                for folder in self.get_folders_of_parent_packages(path):
-                    if (Path(folder) / f".pythoneda-{type.name.lower()}").exists():
-                        result = True
-                        break
-                    elif (
-                        type != HexagonalLayer.DOMAIN
-                        and (
-                            Path(os.path.dirname(path))
-                            / f".pythoneda-{HexagonalLayer.DOMAIN.name.lower()}"
-                        ).exists()
-                    ):
-                        result = False
-                        break
+        result = False
+        if path is None:
+            return False
+
+        from pythoneda.shared.artifact import HexagonalLayer
+
+        if self.single_path_is_of_type(path, type):
+            result = True
+        elif self.single_path_is_not_of_type(path, type):
+            result = False
+        else:
+            result = self.is_of_type(self.get_folder_of_parent_package(path), type)
 
         return result
 

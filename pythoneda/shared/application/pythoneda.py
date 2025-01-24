@@ -34,7 +34,7 @@ from pythoneda.shared.banner import Banner
 from pythoneda.shared.infrastructure.cli import LoggingConfigCli
 from pythoneda.shared.infrastructure.logging import LoggingAdapter
 import sys
-from typing import Callable, Dict, List, Type
+from typing import Callable, Dict, List, Tuple, Type
 import warnings
 
 
@@ -83,7 +83,6 @@ class PythonEDA(PythonedaApplication):
             self._infrastructure_packages,
         ) = self.load_pythoneda_packages()
         self._domain_ports = self.find_domain_ports(self._domain_modules)
-        # print(f"** 3. __init__({name}). Domain ports: {self._domain_ports}")
         self._one_shot = False
         self.initialize()
 
@@ -385,8 +384,12 @@ class PythonEDA(PythonedaApplication):
             if os.path.exists(init_file):
                 # walk through all files and directories in site-packages
                 for root, dirs, _ in os.walk(path):
+                    if ".dist-info" in root:
+                        continue
                     # only consider directories
                     for dir in dirs:
+                        if dir == "__pycache__" or ".dist-info" in dir:
+                            continue
                         # construct the full path
                         full_path = os.path.join(root, dir)
 
@@ -407,11 +410,11 @@ class PythonEDA(PythonedaApplication):
 
         return result
 
-    def load_pythoneda_packages(self) -> tuple:
+    def load_pythoneda_packages(self) -> Tuple[List, List, List]:
         """
         Loads the PythonEDA-related packages.
-        :return: A tuple consisting of (domain packages, domain modules, infrastructure packages, infrastructure modules).
-        :rtype: tuple
+        :return: A tuple consisting of (domain packages, domain modules, infrastructure packages).
+        :rtype: Tuple[List, List, List]
         """
         (
             domain_packages,
@@ -435,8 +438,24 @@ class PythonEDA(PythonedaApplication):
                 self.__class__.extend_missing_items(
                     infrastructure_packages, extra_infrastructure_packages
                 )
-        PythonEDA.log_debug(f"infrastructure packages found: {infrastructure_packages}")
+        self.log_debug_packages("Infrastructure packages:", infrastructure_packages)
         return domain_packages, domain_modules, infrastructure_packages
+
+    def log_debug_packages(self, prefix: str, pkgs: List):
+        """
+        Logs the packages found.
+        :param prefix: The message prefix,
+        :type prefix: str
+        :param pkgs: The packages.
+        :type pkgs: List
+        """
+        bottom_subfolders = [
+            os.path.basename(pkg.rstrip(os.sep))  # rstrip to handle trailing '/' or '\'
+            for pkg in pkgs
+        ]
+
+        # Remove duplicates by converting to a set, then convert back to a list and sort
+        PythonEDA.log_debug(f'{prefix} {", ".join(sorted(set(bottom_subfolders)))}')
 
     def load_packages_under(self, namespace: str) -> tuple:
         """
@@ -467,18 +486,13 @@ class PythonEDA(PythonedaApplication):
                     infrastructure_package = (
                         Bootstrap.instance().is_infrastructure_package(package_path)
                     )
-                    if domain_package:
-                        if package_path not in domain_packages:
-                            domain_packages.append(package_path)
-                        submodules = Bootstrap.instance().import_submodules(
-                            package, HexagonalLayer.DOMAIN, True
-                        )
-                        self.__class__.extend_missing_items(
-                            domain_modules, submodules.values()
-                        )
-                    if infrastructure_package:
-                        if package_path not in infrastructure_packages:
-                            infrastructure_packages.append(package_path)
+                    if domain_package and package_path not in domain_packages:
+                        domain_packages.append(package_path)
+                    if (
+                        infrastructure_package
+                        and package_path not in infrastructure_packages
+                    ):
+                        infrastructure_packages.append(package_path)
                 except Exception as err:
                     PythonEDA.log_error(f"Cannot import package {package_name}: {err}")
                     import traceback
@@ -545,7 +559,6 @@ class PythonEDA(PythonedaApplication):
             cls.logger().error(message)
         else:
             cls._pending_logging.append(("error", message))
-        print(message, file=sys.stderr)
 
     @classmethod
     async def main(cls, name: str = None) -> PythonedaApplication:
