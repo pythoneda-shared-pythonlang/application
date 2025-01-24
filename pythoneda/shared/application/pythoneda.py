@@ -83,8 +83,18 @@ class PythonEDA(PythonedaApplication):
             self._infrastructure_packages,
         ) = self.load_pythoneda_packages()
         self._domain_ports = self.find_domain_ports(self._domain_modules)
+        #        print(f"** 3. __init__({name}). Domain ports: {self._domain_ports}")
         self._one_shot = False
         self.initialize()
+
+    @classmethod
+    def default_name(cls) -> str:
+        """
+        Retrieves the default name.
+        :return: Such name.
+        :rtype: str
+        """
+        return f"{cls.__module__}.{cls.__qualname__}"
 
     @classmethod
     @property
@@ -280,6 +290,8 @@ class PythonEDA(PythonedaApplication):
 
         except ImportError as err:
             PythonEDA.log_error(f"Cannot import module {name}: {err}")
+        except Exception as err:
+            PythonEDA.log_error(f"Cannot import module {name}: {err}")
 
     @staticmethod
     def custom_sort(item):
@@ -406,7 +418,6 @@ class PythonEDA(PythonedaApplication):
             domain_modules,
             infrastructure_packages,
         ) = self.load_packages_under("pythoneda")
-
         extra_namespaces = os.environ.get("PYTHONEDA_EXTRA_NAMESPACES")
         if extra_namespaces is not None:
             for namespace in extra_namespaces.split(":"):
@@ -489,12 +500,14 @@ class PythonEDA(PythonedaApplication):
         from pythoneda.shared.primary_port import PrimaryPort
 
         for module in modules:
-            if Bootstrap.instance().is_domain_module(module):
-                # PrimaryPorts get resolved independently
-                interfaces = Bootstrap.instance().get_interfaces_of_module(
-                    Port, module, PrimaryPort
-                )
-                self.__class__.extend_missing_items(result, interfaces)
+            if module is not None:
+                if Bootstrap.instance().is_domain_module(module):
+                    # PrimaryPorts get resolved independently
+                    interfaces = Bootstrap.instance().get_interfaces_of_module(
+                        Port, module, PrimaryPort
+                    )
+                    self.__class__.extend_missing_items(result, interfaces)
+
         return result
 
     @classmethod
@@ -532,15 +545,16 @@ class PythonEDA(PythonedaApplication):
             cls.logger().error(message)
         else:
             cls._pending_logging.append(("error", message))
+        print(message, file=sys.stderr)
 
     @classmethod
-    async def main(cls, name: str):
+    async def main(cls, name: str = None):
         """
         Runs the application from the command line.
         :param name: The application name.
         :type name: str
         """
-        instance = cls.instance()
+        instance = cls.instance(name)
         instance.bind_invariants()
         await instance.after_bootstrap()
 
@@ -557,14 +571,18 @@ class PythonEDA(PythonedaApplication):
         )
 
     @classmethod
-    def instance(cls):
+    def instance(cls, name: str = None) -> PythonedaApplication:
         """
         Retrieves the singleton instance.
+        :param name: The name.
+        :type name: str
         :return: Such instance.
-        :rtype: pythoneda.shared.application.PythonEDA
+        :rtype: pythoneda.shared.PythonedaApplication
         """
         if cls._singleton is None:
-            cls._singleton = cls()
+            if name is None:
+                name = cls.default_name()
+            cls._singleton = cls(name)
         return cls._singleton
 
     def initialize(self):
@@ -956,7 +974,7 @@ import os
 import sys
 
 if __name__ == "__main__":
-    asyncio.run(PythonEDA.main("pythoneda.shared.application.PythonEDA"))
+    asyncio.run(PythonEDA.main())
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et
 # Local Variables:
 # mode: python
