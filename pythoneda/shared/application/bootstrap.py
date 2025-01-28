@@ -253,7 +253,7 @@ class Bootstrap:
             self.is_of_type,
         )
 
-    def get_interfaces_of_module(self, iface, module, excluding=None):
+    def get_interfaces_of_module(self, iface, module, excluding=None) -> List:
         """
         Retrieves the interfaces extending given one in a module.
         :param iface: The parent interface.
@@ -269,15 +269,21 @@ class Bootstrap:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=DeprecationWarning)
             try:
-                for class_name, self in inspect.getmembers(module, inspect.isclass):
-                    if issubclass(self, iface) and self != iface:
-                        if excluding and issubclass(self, excluding):
+                for class_name, subc in inspect.getmembers(module, inspect.isclass):
+                    if (
+                        inspect.isclass(subc)
+                        and issubclass(subc, iface)
+                        and subc != iface
+                        and (subc.__module__ == module.__name__)
+                    ):
+                        if excluding and issubclass(subc, excluding):
                             pass
                         else:
-                            result.append(self)
+                            result.append(subc)
             except ImportError as err:
-                self.__class__.error(f"Cannot get members of {module}: {err}")
+                Bootstrap.logger().error(f"Cannot get members of {module}: {err}")
                 pass
+
         return result
 
     def get_adapters(self, interface, modules: List):
@@ -349,7 +355,7 @@ class Bootstrap:
                             and not ".logging." in name
                             and not ".git."
                         ):
-                            self.__class__.error(
+                            Bootstrap.logger().error(
                                 f"Error importing {name}: {err} while loading {package.__path__}"
                             )
         return results
@@ -370,11 +376,11 @@ class Bootstrap:
                 package = importlib.import_module(packageName)
                 return importlib.reload(package)
         except Exception as err:
-            self.__class__.error(f"Cannot import package {packageName}: {err}")
+            Bootstrap.logger().error(f"Cannot import package {packageName}: {err}")
             import traceback
 
             traceback.print_exc()
-            self.__class__.error("")
+            Bootstrap.logger().error("")
 
             return None
 

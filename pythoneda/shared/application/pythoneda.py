@@ -81,7 +81,7 @@ class PythonEDA(PythonedaApplication):
             self._domain_packages,
             self._domain_modules,
             self._infrastructure_packages,
-        ) = self.load_pythoneda_packages()
+        ) = self.load_bounded_context()
         self._domain_ports = self.find_domain_ports(self._domain_modules)
         self._one_shot = False
         self.initialize()
@@ -260,7 +260,9 @@ class PythonEDA(PythonedaApplication):
                 ):
                     # Use find_spec instead of find_module
                     spec = importer.find_spec(pkg)
-                    if spec is not None:
+                    if spec is None:
+                        PythonEDA.log_error(f"Spec is none for {pkg}")
+                    else:
                         try:
                             # Load the module using the spec
                             module = importlib.util.module_from_spec(spec)
@@ -410,9 +412,9 @@ class PythonEDA(PythonedaApplication):
 
         return result
 
-    def load_pythoneda_packages(self) -> Tuple[List, List, List]:
+    def load_bounded_context(self) -> Tuple[List, List, List]:
         """
-        Loads the PythonEDA-related packages.
+        Loads the bounded context packages.
         :return: A tuple consisting of (domain packages, domain modules, infrastructure packages).
         :rtype: Tuple[List, List, List]
         """
@@ -488,6 +490,13 @@ class PythonEDA(PythonedaApplication):
                     )
                     if domain_package and package_path not in domain_packages:
                         domain_packages.append(package_path)
+                        PythonEDA.log_debug(f"Found domain package {package_path}")
+                        submodules = Bootstrap.instance().import_submodules(
+                            package, HexagonalLayer.DOMAIN, True
+                        )
+                        self.__class__.extend_missing_items(
+                            domain_modules, submodules.values()
+                        )
                     if (
                         infrastructure_package
                         and package_path not in infrastructure_packages
@@ -520,6 +529,7 @@ class PythonEDA(PythonedaApplication):
                     interfaces = Bootstrap.instance().get_interfaces_of_module(
                         Port, module, PrimaryPort
                     )
+                    # print(f"Interfaces of {module}: {interfaces}")
                     self.__class__.extend_missing_items(result, interfaces)
 
         return result
@@ -623,10 +633,14 @@ class PythonEDA(PythonedaApplication):
             )
             LoggingConfigCli().entrypoint(self)
 
+            aux = "\n".join([str(m) for m in PythonEDA.enabled_infrastructure_modules])
+            PythonEDA.log_debug(f"Enabled infrastructure modules:\n{aux}")
+
             self._primary_ports = Bootstrap.instance().get_adapters(
                 PrimaryPort, PythonEDA.enabled_infrastructure_modules
             )
             mappings[PrimaryPort] = self._primary_ports
+            PythonEDA.log_debug(f"Domain ports: {self.domain_ports}")
             for port in self.domain_ports:
                 implementations = Bootstrap.instance().get_adapters(
                     port, PythonEDA.enabled_infrastructure_modules
@@ -653,16 +667,17 @@ class PythonEDA(PythonedaApplication):
 
             from pythoneda.shared.ports import Ports
 
+            PythonEDA.log_debug(f"Initializing ports with mappings: {mappings}")
             Ports.initialize(mappings)
 
             self.__class__._logging_configured = True
             for level, message in self.__class__._pending_logging:
                 if level == "debug":
-                    self.__class__.logger().debug(message)
+                    PythonEDA.logger().debug(message)
                 elif level == "info":
-                    self.__class__.logger().info(message)
+                    PythonEDA.logger().info(message)
                 elif level == "error":
-                    self.__class__.logger().error(message)
+                    PythonEDA.logger().error(message)
 
             from pythoneda.shared.event_listener import EventListener
             from pythoneda.shared.event_emitter import EventEmitter
