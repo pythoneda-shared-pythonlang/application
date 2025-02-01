@@ -679,7 +679,6 @@ class PythonEDA(PythonedaApplication):
                 elif level == "error":
                     PythonEDA.logger().error(message)
 
-            from pythoneda.shared.event_listener import EventListener
             from pythoneda.shared.event_emitter import EventEmitter
 
             EventEmitter.register_receiver(self)

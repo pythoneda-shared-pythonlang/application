@@ -24,13 +24,14 @@ import importlib.util
 import inspect
 import os
 from pathlib import Path
+from pythoneda.shared import BaseObject
 import pkgutil
 import sys
 from typing import Callable, Dict, List
 import warnings
 
 
-class Bootstrap:
+class Bootstrap(BaseObject):
     """
     Provides logic required to bootstrapping PythonEDA applications.
 
