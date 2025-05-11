@@ -93,7 +93,12 @@ class PythonEDA(PythonedaApplication):
         :return: Such name.
         :rtype: str
         """
-        return f"{cls.__module__}.{cls.__qualname__}"
+        module = cls.__module__
+        if module == "__main__":
+            module = ""
+        else:
+            module = f"{module}."
+        return f"{module}{cls.__qualname__}"
 
     @classmethod
     @property
@@ -631,7 +636,6 @@ class PythonEDA(PythonedaApplication):
                     "pythoneda.shared.infrastructure.logging.logging_config"
                 )
             )
-            LoggingConfigCli().entrypoint(self)
 
             aux = "\n".join([str(m) for m in PythonEDA.enabled_infrastructure_modules])
             PythonEDA.log_debug(f"Enabled infrastructure modules:\n{aux}")
@@ -800,15 +804,16 @@ class PythonEDA(PythonedaApplication):
         """
         Notification the application has been launched from the CLI.
         """
-        for primary_port in sorted(self.primary_ports, key=self.delegate_priority):
-            if primary_port != LoggingConfigCli and (
-                not self.one_shot or primary_port.is_one_shot_compatible
-            ):
-                previous_one_shot = self.one_shot
-                port = self.get_primary_port_instance(primary_port)
-                if port is not None:
-                    await port.entrypoint(self)
-                    one_shot_changed = previous_one_shot != self.one_shot
+        primary_ports = sorted(self.primary_ports, key=self.delegate_priority)
+        primary_port_instances = []
+        for primary_port in primary_ports:
+            port = self.get_primary_port_instance(primary_port)
+            primary_port_instances.append(port)
+            await port.configure()
+
+        for primary_port_instance in primary_port_instances:
+            if primary_port_instance is not None:
+                await primary_port_instance.entrypoint(self)
 
     async def after_bootstrap(self):
         """
